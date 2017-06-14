@@ -20,13 +20,10 @@
 package watch
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/jeevatkm/go-model"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	kubeapi "k8s.io/client-go/pkg/api"
@@ -37,34 +34,38 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	kubev1 "kubevirt.io/kubevirt/pkg/api/v1"
+	kubeinformers "kubevirt.io/kubevirt/pkg/informers"
 	"kubevirt.io/kubevirt/pkg/kubecli"
 	"kubevirt.io/kubevirt/pkg/logging"
 	"kubevirt.io/kubevirt/pkg/virt-controller/services"
 )
 
-func NewVMController(vmService services.VMService, recorder record.EventRecorder, restClient *rest.RESTClient, clientset *kubernetes.Clientset) *VMController {
-	lw := cache.NewListWatchFromClient(restClient, "vms", kubeapi.NamespaceDefault, fields.Everything())
+func NewVMController(vmService services.VMService, recorder record.EventRecorder, restClient *rest.RESTClient, clientset *kubernetes.Clientset, informerFactory kubeinformers.KubeInformerFactory) *VMController {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	indexer, informer := cache.NewIndexerInformer(lw, &kubev1.VM{}, 0, kubecli.NewResourceEventHandlerFuncsForWorkqueue(queue), cache.Indexers{})
+	vmInformer := informerFactory.VM()
+	vmInformer.AddEventHandler(kubecli.NewResourceEventHandlerFuncsForWorkqueue(queue))
+
 	return &VMController{
-		restClient: restClient,
-		vmService:  vmService,
-		queue:      queue,
-		store:      indexer,
-		informer:   informer,
-		recorder:   recorder,
-		clientset:  clientset,
+		restClient:      restClient,
+		vmService:       vmService,
+		queue:           queue,
+		store:           vmInformer.GetStore(),
+		informer:        vmInformer,
+		recorder:        recorder,
+		clientset:       clientset,
+		informerFactory: informerFactory,
 	}
 }
 
 type VMController struct {
-	restClient *rest.RESTClient
-	vmService  services.VMService
-	clientset  *kubernetes.Clientset
-	queue      workqueue.RateLimitingInterface
-	store      cache.Store
-	informer   cache.Controller
-	recorder   record.EventRecorder
+	restClient      *rest.RESTClient
+	vmService       services.VMService
+	clientset       *kubernetes.Clientset
+	queue           workqueue.RateLimitingInterface
+	store           cache.Store
+	informer        cache.SharedIndexInformer
+	recorder        record.EventRecorder
+	informerFactory kubeinformers.KubeInformerFactory
 }
 
 func (c *VMController) Run(threadiness int, stopCh chan struct{}) {
@@ -72,14 +73,14 @@ func (c *VMController) Run(threadiness int, stopCh chan struct{}) {
 	defer c.queue.ShutDown()
 	logging.DefaultLogger().Info().Msg("Starting controller.")
 
+	vmPodInformer := c.informerFactory.VMPods()
+	vmPodInformer.AddEventHandler(kubecli.NewResourceEventHandlerFuncsForFunc(vmLabelHandler(c.queue)))
+
 	// Start all informers/controllers and wait for the cache sync
-	// TODO, change controllers to informers
-	_, podInformer := NewVMPodInformer(c.clientset, c.queue)
-	go podInformer.Run(stopCh)
-	go c.informer.Run(stopCh)
+	c.informerFactory.Start(stopCh)
 
 	// Wait for cache sync before we start the pod controller
-	cache.WaitForCacheSync(stopCh, c.informer.HasSynced, podInformer.HasSynced)
+	cache.WaitForCacheSync(stopCh, c.informer.HasSynced, vmPodInformer.HasSynced)
 
 	// Start the actual work
 	for i := 0; i < threadiness; i++ {
@@ -255,26 +256,6 @@ func (c *VMController) execute(key string) error {
 		logger.Info().Msgf("VM successfully scheduled to %s.", vmCopy.Status.NodeName)
 	}
 	return nil
-}
-
-func scheduledVMPodSelector() kubeapi.ListOptions {
-	fieldSelectionQuery := fmt.Sprintf("status.phase=%s", string(kubeapi.PodRunning))
-	fieldSelector := fields.ParseSelectorOrDie(fieldSelectionQuery)
-	labelSelectorQuery := fmt.Sprintf("!%s, %s in (virt-launcher)", string(kubev1.MigrationLabel), kubev1.AppLabel)
-	labelSelector, err := labels.Parse(labelSelectorQuery)
-	if err != nil {
-		panic(err)
-	}
-	return kubeapi.ListOptions{FieldSelector: fieldSelector, LabelSelector: labelSelector}
-}
-
-// Informer, which checks for VM target Pods
-func NewVMPodInformer(clientSet *kubernetes.Clientset, vmQueue workqueue.RateLimitingInterface) (cache.Store, cache.Controller) {
-	selector := scheduledVMPodSelector()
-	lw := kubecli.NewListWatchFromClient(clientSet.CoreV1().RESTClient(), "pods", kubeapi.NamespaceDefault, selector.FieldSelector, selector.LabelSelector)
-	return cache.NewIndexerInformer(lw, &k8sv1.Pod{}, 0,
-		kubecli.NewResourceEventHandlerFuncsForFunc(vmLabelHandler(vmQueue)),
-		cache.Indexers{})
 }
 
 func vmLabelHandler(vmQueue workqueue.RateLimitingInterface) func(obj interface{}) {
