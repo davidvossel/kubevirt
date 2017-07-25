@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"kubevirt.io/kubevirt/pkg/api/v1"
+	cloudinit "kubevirt.io/kubevirt/pkg/cloud-init"
 	"kubevirt.io/kubevirt/pkg/logging"
 	"kubevirt.io/kubevirt/pkg/precond"
 	registrydisk "kubevirt.io/kubevirt/pkg/registry-disk"
@@ -43,6 +44,8 @@ type templateService struct {
 
 //Deprecated: remove the service and just use a builder or contextcless helper function
 func (t *templateService) RenderLaunchManifest(vm *v1.VM) (*kubev1.Pod, error) {
+	var containers []kubev1.Container
+
 	precond.MustNotBeNil(vm)
 	domain := precond.MustNotBeEmpty(vm.GetObjectMeta().GetName())
 	uid := precond.MustNotBeEmpty(string(vm.GetObjectMeta().GetUID()))
@@ -55,11 +58,24 @@ func (t *templateService) RenderLaunchManifest(vm *v1.VM) (*kubev1.Pod, error) {
 		Command:         []string{"/virt-launcher", "--qemu-timeout", "60s"},
 	}
 
-	containers, err := registrydisk.GenerateContainers(vm)
+	diskContainers, err := registrydisk.GenerateContainers(vm)
 	if err != nil {
 		return nil, err
 	}
+
+	cloudInitContainers, err := cloudinit.GenerateContainers(vm, t.launcherImage)
+	if err != nil {
+		return nil, err
+	}
+
+	volumes, err := cloudinit.GenerateVolumes(vm)
+	if err != nil {
+		return nil, err
+	}
+
 	containers = append(containers, container)
+	containers = append(containers, diskContainers...)
+	containers = append(containers, cloudInitContainers...)
 
 	// TODO use constants for labels
 	pod := kubev1.Pod{
@@ -75,6 +91,7 @@ func (t *templateService) RenderLaunchManifest(vm *v1.VM) (*kubev1.Pod, error) {
 			RestartPolicy: kubev1.RestartPolicyNever,
 			Containers:    containers,
 			NodeSelector:  vm.Spec.NodeSelector,
+			Volumes:       volumes,
 		},
 	}
 

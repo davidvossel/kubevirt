@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 
 	"kubevirt.io/kubevirt/pkg/api/v1"
+	cloudinit "kubevirt.io/kubevirt/pkg/cloud-init"
 	"kubevirt.io/kubevirt/pkg/logging"
 	"kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/api"
 )
@@ -444,6 +445,9 @@ func (l *LibvirtDomainManager) KillVM(vm *v1.VM) error {
 		logging.DefaultLogger().Object(vm).Error().Reason(err).Msg("Undefining the domain state failed.")
 		return err
 	}
+
+	cloudinit.RemoveLocalData(vm)
+
 	logging.DefaultLogger().Object(vm).Info().Msg("Domain undefined.")
 	l.recorder.Event(vm, kubev1.EventTypeNormal, v1.Deleted.String(), "VM undefined")
 	return nil

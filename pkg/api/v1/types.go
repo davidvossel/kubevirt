@@ -116,7 +116,8 @@ type VMList struct {
 
 // VMSpec is a description of a VM
 type VMSpec struct {
-	Domain *DomainSpec `json:"domain,omitempty"`
+	Domain    *DomainSpec    `json:"domain,omitempty"`
+	CloudInit *CloudInitSpec `json:"cloudInit,omitempty"`
 	// If labels are specified, only nodes marked with all of these labels are considered when scheduling the VM.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 }
