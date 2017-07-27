@@ -14,6 +14,7 @@ import (
 
 	"k8s.io/client-go/kubernetes"
 
+	cloudinit "kubevirt.io/kubevirt/pkg/cloud-init"
 	kubeinformers "kubevirt.io/kubevirt/pkg/informers"
 	"kubevirt.io/kubevirt/pkg/kubecli"
 	"kubevirt.io/kubevirt/pkg/logging"
@@ -43,6 +44,8 @@ type VirtControllerApp struct {
 	port          int
 	launcherImage string
 	migratorImage string
+
+	cloudInitDir string
 }
 
 func Execute() {
@@ -105,6 +108,8 @@ func (vca *VirtControllerApp) Run() {
 
 func (vca *VirtControllerApp) initCommon() {
 	var err error
+
+	cloudinit.SetLocalDirectory(vca.cloudInitDir)
 	vca.templateService, err = services.NewTemplateService(vca.launcherImage, vca.migratorImage)
 	if err != nil {
 		golog.Fatal(err)
@@ -119,5 +124,6 @@ func (vca *VirtControllerApp) DefineFlags() {
 	flag.IntVar(&vca.port, "port", 8182, "Port to listen on")
 	flag.StringVar(&vca.launcherImage, "launcher-image", "virt-launcher", "Shim container for containerized VMs")
 	flag.StringVar(&vca.migratorImage, "migrator-image", "virt-handler", "Container which orchestrates a VM migration")
+	flag.StringVar(&vca.cloudInitDir, "cloud-init-dir", "/var/run/libvirt/cloud-init-dir", "Base directory for ephemeral cloud init data.")
 	flag.Parse()
 }

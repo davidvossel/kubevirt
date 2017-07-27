@@ -35,6 +35,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	cloudinit "kubevirt.io/kubevirt/pkg/cloud-init"
 	"kubevirt.io/kubevirt/pkg/logging"
 )
 
@@ -140,14 +141,31 @@ func (mon *Monitor) RunForever(startTimeout time.Duration) {
 	log.Printf("Exiting...")
 }
 
+func markReady(readinessFile string) {
+	f, err := os.OpenFile(readinessFile, os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		panic(err)
+	}
+	f.Close()
+	log.Printf("Marked as ready")
+}
+
 func main() {
 	startTimeout := 0 * time.Second
 
 	logging.InitializeLogging("virt-launcher")
 	qemuTimeout := flag.Duration("qemu-timeout", startTimeout, "Amount of time to wait for qemu")
+	readinessFile := flag.String("readiness-file", "/tmp/health", "Pod looks for tihs file to determine when virt-launcher is initialized")
 	debugMode := flag.Bool("debug", false, "Enable debug messages")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
+
+	err := cloudinit.GenerateLocalData()
+	if err != nil {
+		panic(err)
+	}
+
+	markReady(*readinessFile)
 
 	mon := Monitor{
 		exename:   "qemu",
@@ -155,6 +173,7 @@ func main() {
 	}
 
 	mon.RunForever(*qemuTimeout)
+	cloudinit.RemoveLocalData()
 }
 
 func readProcCmdline(pathname string) ([]string, error) {
