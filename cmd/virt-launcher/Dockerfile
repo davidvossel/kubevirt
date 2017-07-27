@@ -20,6 +20,9 @@ FROM fedora:26
 
 MAINTAINER "The KubeVirt Project" <kubevirt-dev@googlegroups.com>
 
+RUN dnf install -y genisoimage && dnf clean all
+
 COPY virt-launcher /virt-launcher
+COPY config-disk.sh /config-disk.sh
 
 ENTRYPOINT [ "/virt-launcher" ]

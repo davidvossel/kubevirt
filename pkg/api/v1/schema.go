@@ -25,6 +25,13 @@ package v1
  ATTENTION: Rerun code generators when comments on structs or fields are modified.
 */
 
+type CloudInitSpec struct {
+	Type             string `json:"type"`
+	UserDataBase64   string `json:"userDataBase64"`
+	MetaDataBase64   string `json:"metaDataBase64"`
+	ConfigDiskTarget string `json:"configDiskTarget"`
+}
+
 type DomainSpec struct {
 	Memory  Memory   `json:"memory"`
 	Type    string   `json:"type"`

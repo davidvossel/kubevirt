@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	kubev1 "kubevirt.io/kubevirt/pkg/api/v1"
+	cloudinit "kubevirt.io/kubevirt/pkg/cloud-init"
 	"kubevirt.io/kubevirt/pkg/kubecli"
 	"kubevirt.io/kubevirt/pkg/logging"
 	registrydisk "kubevirt.io/kubevirt/pkg/registry-disk"
@@ -182,6 +183,7 @@ func (c *VMController) execute(key string) error {
 		}
 
 		registrydisk.ApplyPorts(&vmCopy)
+		cloudinit.ApplyMetadata(&vmCopy)
 
 		// Create a Pod which will be the VM destination
 		if err := c.vmService.StartVMPod(&vmCopy); err != nil {
@@ -233,6 +235,11 @@ func (c *VMController) execute(key string) error {
 		// Ensure registry disks are online before placing VM
 		if registrydisk.DisksAreReady(&pods.Items[0]) == false {
 			return errors.New("waiting on image wrapper disks to become ready")
+		}
+
+		// Ensure cloud-init data is available for VM to consume
+		if cloudinit.IsAvailable(vm, &pods.Items[0]) == false {
+			return errors.New("waiting on cloud-init data for this VM to become available.")
 		}
 
 		// VM got scheduled

@@ -2,6 +2,10 @@
 
 package v1
 
+func (CloudInitSpec) SwaggerDoc() map[string]string {
+	return map[string]string{}
+}
+
 func (DomainSpec) SwaggerDoc() map[string]string {
 	return map[string]string{}
 }
