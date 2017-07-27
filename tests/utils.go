@@ -20,6 +20,7 @@
 package tests
 
 import (
+	"encoding/base64"
 	"fmt"
 	"reflect"
 	"time"
@@ -414,6 +415,19 @@ func NewRandomVMWithEphemeralDisk(containerImage string) *v1.VM {
 			Device: "vda",
 		},
 	}}
+	return vm
+}
+
+func NewRandomVMWithUserData(containerImage string) *v1.VM {
+
+	userData := "#cloud-config\npassword: atomic\nssh_pwauth: True\nchpasswd: { expire: False }\n"
+
+	vm := NewRandomVMWithEphemeralDisk(containerImage)
+	vm.Spec.CloudInit = &v1.CloudInitSpec{
+		Type:             "configDisk",
+		ConfigDiskTarget: "vdb",
+		UserDataBase64:   base64.StdEncoding.EncodeToString([]byte(userData)),
+	}
 	return vm
 }
 
