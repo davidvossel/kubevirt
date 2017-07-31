@@ -32,6 +32,26 @@ func (_m *MockDomainManager) EXPECT() *_MockDomainManagerRecorder {
 	return _m.recorder
 }
 
+func (_m *MockDomainManager) SyncVMSecret(vm *v1.VM, usageType string, usageID string, secretValue string) error {
+	ret := _m.ctrl.Call(_m, "SyncVMSecret", vm, usageType, usageID, secretValue)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockDomainManagerRecorder) SyncVMSecret(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SyncVMSecret", arg0, arg1, arg2, arg3)
+}
+
+func (_m *MockDomainManager) RemoveVMSecrets(_param0 *v1.VM) error {
+	ret := _m.ctrl.Call(_m, "RemoveVMSecrets", _param0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockDomainManagerRecorder) RemoveVMSecrets(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "RemoveVMSecrets", arg0)
+}
+
 func (_m *MockDomainManager) SyncVM(_param0 *v1.VM) (*api.DomainSpec, error) {
 	ret := _m.ctrl.Call(_m, "SyncVM", _param0)
 	ret0, _ := ret[0].(*api.DomainSpec)
@@ -83,6 +103,39 @@ func (_m *MockConnection) LookupDomainByName(name string) (VirDomain, error) {
 
 func (_mr *_MockConnectionRecorder) LookupDomainByName(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "LookupDomainByName", arg0)
+}
+
+func (_m *MockConnection) LookupSecretByUsage(usageType libvirt_go.SecretUsageType, usageID string) (VirSecret, error) {
+	ret := _m.ctrl.Call(_m, "LookupSecretByUsage", usageType, usageID)
+	ret0, _ := ret[0].(VirSecret)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockConnectionRecorder) LookupSecretByUsage(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "LookupSecretByUsage", arg0, arg1)
+}
+
+func (_m *MockConnection) SecretDefineXML(xml string) (VirSecret, error) {
+	ret := _m.ctrl.Call(_m, "SecretDefineXML", xml)
+	ret0, _ := ret[0].(VirSecret)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockConnectionRecorder) SecretDefineXML(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SecretDefineXML", arg0)
+}
+
+func (_m *MockConnection) ListAllSecrets(flags libvirt_go.ConnectListAllSecretsFlags) ([]VirSecret, error) {
+	ret := _m.ctrl.Call(_m, "ListAllSecrets", flags)
+	ret0, _ := ret[0].([]VirSecret)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockConnectionRecorder) ListAllSecrets(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "ListAllSecrets", arg0)
 }
 
 func (_m *MockConnection) DomainDefineXML(xml string) (VirDomain, error) {
@@ -200,6 +253,90 @@ func (_m *MockStream) UnderlyingStream() *libvirt_go.Stream {
 
 func (_mr *_MockStreamRecorder) UnderlyingStream() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "UnderlyingStream")
+}
+
+// Mock of VirSecret interface
+type MockVirSecret struct {
+	ctrl     *gomock.Controller
+	recorder *_MockVirSecretRecorder
+}
+
+// Recorder for MockVirSecret (not exported)
+type _MockVirSecretRecorder struct {
+	mock *MockVirSecret
+}
+
+func NewMockVirSecret(ctrl *gomock.Controller) *MockVirSecret {
+	mock := &MockVirSecret{ctrl: ctrl}
+	mock.recorder = &_MockVirSecretRecorder{mock}
+	return mock
+}
+
+func (_m *MockVirSecret) EXPECT() *_MockVirSecretRecorder {
+	return _m.recorder
+}
+
+func (_m *MockVirSecret) SetValue(value []byte, flags uint32) error {
+	ret := _m.ctrl.Call(_m, "SetValue", value, flags)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockVirSecretRecorder) SetValue(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetValue", arg0, arg1)
+}
+
+func (_m *MockVirSecret) Undefine() error {
+	ret := _m.ctrl.Call(_m, "Undefine")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockVirSecretRecorder) Undefine() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Undefine")
+}
+
+func (_m *MockVirSecret) GetUsageID() (string, error) {
+	ret := _m.ctrl.Call(_m, "GetUsageID")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockVirSecretRecorder) GetUsageID() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetUsageID")
+}
+
+func (_m *MockVirSecret) GetUUID() ([]byte, error) {
+	ret := _m.ctrl.Call(_m, "GetUUID")
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockVirSecretRecorder) GetUUID() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetUUID")
+}
+
+func (_m *MockVirSecret) GetXMLDesc(flags uint32) (string, error) {
+	ret := _m.ctrl.Call(_m, "GetXMLDesc", flags)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockVirSecretRecorder) GetXMLDesc(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetXMLDesc", arg0)
+}
+
+func (_m *MockVirSecret) Free() error {
+	ret := _m.ctrl.Call(_m, "Free")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockVirSecretRecorder) Free() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Free")
 }
 
 // Mock of VirDomain interface

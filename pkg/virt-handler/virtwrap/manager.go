@@ -45,6 +45,8 @@ import (
 )
 
 type DomainManager interface {
+	SyncVMSecret(vm *v1.VM, usageType string, usageID string, secretValue string) error
+	RemoveVMSecrets(*v1.VM) error
 	SyncVM(*v1.VM) (*api.DomainSpec, error)
 	KillVM(*v1.VM) error
 }
@@ -52,6 +54,11 @@ type DomainManager interface {
 // TODO: Should we handle libvirt connection errors transparent or panic?
 type Connection interface {
 	LookupDomainByName(name string) (VirDomain, error)
+	LookupSecretByUsage(usageType libvirt.SecretUsageType, usageID string) (VirSecret, error)
+	SecretDefineXML(xml string) (VirSecret, error)
+	ListSecrets() ([]string, error)
+	LookupSecretByUUIDString(uuid string) (VirSecret, error)
+	ListAllSecrets(flags libvirt.ConnectListAllSecretsFlags) ([]VirSecret, error)
 	DomainDefineXML(xml string) (VirDomain, error)
 	Close() (int, error)
 	DomainEventLifecycleRegister(callback libvirt.DomainEventLifecycleCallback) error
@@ -122,6 +129,36 @@ func (l *LibvirtConnection) Close() (int, error) {
 	return l.Close()
 }
 
+func (l *LibvirtConnection) ListSecrets() (secrets []string, err error) {
+	if err = l.reconnectIfNecessary(); err != nil {
+		return
+	}
+	defer l.checkConnectionLost()
+
+	secrets, err = l.Connect.ListSecrets()
+	return
+}
+
+func (l *LibvirtConnection) LookupSecretByUUIDString(uuid string) (secret VirSecret, err error) {
+	if err = l.reconnectIfNecessary(); err != nil {
+		return
+	}
+	defer l.checkConnectionLost()
+
+	secret, err = l.Connect.LookupSecretByUUIDString(uuid)
+	return
+}
+
+func (l *LibvirtConnection) LookupSecretByUsage(usageType libvirt.SecretUsageType, usageID string) (secret VirSecret, err error) {
+	if err = l.reconnectIfNecessary(); err != nil {
+		return
+	}
+	defer l.checkConnectionLost()
+
+	secret, err = l.Connect.LookupSecretByUsage(usageType, usageID)
+	return
+}
+
 func (l *LibvirtConnection) DomainEventLifecycleRegister(callback libvirt.DomainEventLifecycleCallback) (err error) {
 	if err = l.reconnectIfNecessary(); err != nil {
 		return
@@ -142,6 +179,16 @@ func (l *LibvirtConnection) LookupDomainByName(name string) (dom VirDomain, err 
 	return l.Connect.LookupDomainByName(name)
 }
 
+func (l *LibvirtConnection) SecretDefineXML(xml string) (secret VirSecret, err error) {
+	if err = l.reconnectIfNecessary(); err != nil {
+		return
+	}
+	defer l.checkConnectionLost()
+
+	secret, err = l.Connect.SecretDefineXML(xml, 0)
+	return
+}
+
 func (l *LibvirtConnection) DomainDefineXML(xml string) (dom VirDomain, err error) {
 	if err = l.reconnectIfNecessary(); err != nil {
 		return
@@ -150,6 +197,23 @@ func (l *LibvirtConnection) DomainDefineXML(xml string) (dom VirDomain, err erro
 
 	dom, err = l.Connect.DomainDefineXML(xml)
 	return
+}
+
+func (l *LibvirtConnection) ListAllSecrets(flags libvirt.ConnectListAllSecretsFlags) ([]VirSecret, error) {
+	if err := l.reconnectIfNecessary(); err != nil {
+		return nil, err
+	}
+	defer l.checkConnectionLost()
+
+	virSecrets, err := l.Connect.ListAllSecrets(flags)
+	if err != nil {
+		return nil, err
+	}
+	secrets := make([]VirSecret, len(virSecrets))
+	for i, d := range virSecrets {
+		secrets[i] = &d
+	}
+	return secrets, nil
 }
 
 func (l *LibvirtConnection) ListAllDomains(flags libvirt.ConnectListAllDomainsFlags) ([]VirDomain, error) {
@@ -242,6 +306,14 @@ func (l *LibvirtConnection) checkConnectionLost() {
 	}
 }
 
+type VirSecret interface {
+	SetValue(value []byte, flags uint32) error
+	Undefine() error
+	GetUsageID() (string, error)
+	GetUUID() ([]byte, error)
+	GetXMLDesc(flags uint32) (string, error)
+	Free() error
+}
 type VirDomain interface {
 	GetState() (libvirt.DomainState, int, error)
 	Create() error
@@ -328,11 +400,52 @@ func VMNamespaceKeyFunc(vm *v1.VM) string {
 	return domName
 }
 
+func (l *LibvirtDomainManager) SyncVMSecret(vm *v1.VM, usageType string, usageID string, secretValue string) error {
+
+	domName := VMNamespaceKeyFunc(vm)
+	libvirtSecret, err := l.virConn.LookupSecretByUsage(libvirt.SECRET_USAGE_TYPE_ISCSI, usageID)
+
+	// If the secret doesn't exist, make it
+	if err != nil {
+		if err.(libvirt.Error).Code != libvirt.ERR_NO_SECRET {
+			logging.DefaultLogger().Object(vm).Error().Reason(err).Msg("Failed to get libvirt secret.")
+			return err
+
+		}
+		secretSpec := &api.SecretSpec{
+			Ephemeral:   "no",
+			Private:     "yes",
+			Description: domName,
+			Usage: api.SecretUsage{
+				Type:   usageType,
+				Target: usageID,
+			},
+		}
+
+		xmlStr, err := xml.Marshal(&secretSpec)
+		libvirtSecret, err = l.virConn.SecretDefineXML(string(xmlStr))
+		if err != nil {
+			logging.DefaultLogger().Error().Reason(err).Msg("Defining the VM secret failed.")
+			return err
+		}
+	}
+	defer libvirtSecret.Free()
+
+	err = libvirtSecret.SetValue([]byte(secretValue), 0)
+	if err != nil {
+		logging.DefaultLogger().Error().Reason(err).Msg("Setting secret value for the VM failed.")
+		return err
+	}
+
+	return nil
+}
+
 func (l *LibvirtDomainManager) SyncVM(vm *v1.VM) (*api.DomainSpec, error) {
 	var wantedSpec api.DomainSpec
 	mappingErrs := model.Copy(&wantedSpec, vm.Spec.Domain)
 
 	if len(mappingErrs) > 0 {
+		logging.DefaultLogger().Error().Msg("model copy failed.")
 		return nil, errors.NewAggregate(mappingErrs)
 	}
 
@@ -409,7 +522,53 @@ func (l *LibvirtDomainManager) SyncVM(vm *v1.VM) (*api.DomainSpec, error) {
 	return &newSpec, nil
 }
 
+func (l *LibvirtDomainManager) RemoveVMSecrets(vm *v1.VM) error {
+	domName := VMNamespaceKeyFunc(vm)
+
+	// TODO this is horribly inefficient. Maybe there's a better way?
+	// Every time we want to garbage collect secrets associated
+	// with a VM, we have to iterate over the entire secrets list
+	secrets, err := l.virConn.ListSecrets()
+	if err != nil {
+		if err.(libvirt.Error).Code == libvirt.ERR_NO_SECRET {
+			return nil
+		} else {
+			return err
+		}
+	}
+
+	for _, secretUUID := range secrets {
+		var secretSpec api.SecretSpec
+
+		secret, err := l.virConn.LookupSecretByUUIDString(secretUUID)
+		if err != nil {
+			return err
+		}
+
+		xmlstr, err := secret.GetXMLDesc(0)
+		if err != nil {
+			secret.Free()
+			return err
+		}
+
+		err = xml.Unmarshal([]byte(xmlstr), &secretSpec)
+		if err != nil {
+			secret.Free()
+			return err
+		}
+		if secretSpec.Description == domName {
+			err = secret.Undefine()
+			if err != nil {
+				secret.Free()
+				return err
+			}
+			secret.Free()
+		}
+	}
+	return nil
+}
 func (l *LibvirtDomainManager) KillVM(vm *v1.VM) error {
+
 	domName := VMNamespaceKeyFunc(vm)
 	dom, err := l.virConn.LookupDomainByName(domName)
 	if err != nil {

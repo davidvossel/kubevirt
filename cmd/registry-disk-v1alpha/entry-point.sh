@@ -58,9 +58,11 @@ tgtadm --lld iscsi --mode target --op new --tid=1 --targetname $WWN
 tgtadm --lld iscsi --mode target --op bind --tid=1 -I ALL
 
 if [ $authenticate -eq 1 ]; then
-	echo "Adding authentication for user $USERNAME"
-	tgtadm --lld iscsi --op new --mode account --user $USERNAME --password $PASSWORD
-	tgtadm --lld iscsi --op bind --mode account --tid=1 --user $USERNAME
+	decoded_username=$(echo $USERNAME | base64 -d)
+	decoded_password=$(echo $PASSWORD | base64 -d)
+	echo "Adding authentication for user $decoded_username"
+	tgtadm --lld iscsi --op new --mode account --user $decoded_username --password $decoded_password
+	tgtadm --lld iscsi --op bind --mode account --tid=1 --user $decoded_username
 fi
 
 echo "Adding volume file as LUN"

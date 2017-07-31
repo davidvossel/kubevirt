@@ -20,6 +20,8 @@
 package virthandler
 
 import (
+	"encoding/base64"
+	goerror "errors"
 	"fmt"
 	"net"
 	"strings"
@@ -284,9 +286,43 @@ func MapPersistentVolumes(vm *v1.VM, restClient cache.Getter, namespace string) 
 	return vmCopy, nil
 }
 
+func (d *VMHandlerDispatch) addVmSecrets(vm *v1.VM) error {
+	for _, disk := range vm.Spec.Domain.Devices.Disks {
+		if disk.Auth == nil || disk.Auth.Secret == nil || disk.Auth.Secret.Usage == "" {
+			continue
+		}
+		usageID := disk.Auth.Secret.Usage
+		usageType := disk.Auth.Secret.Type
+		secret, err := d.clientset.CoreV1().Secrets(vm.ObjectMeta.Namespace).Get(usageID, metav1.GetOptions{})
+		if err != nil {
+			logging.DefaultLogger().Error().Reason(err).Msg("Defining the VM secret failed unable to pull corresponding k8s secret value")
+			return err
+		}
+
+		secretBase64, ok := secret.Data["password"]
+		if ok == false {
+			return goerror.New(fmt.Sprintf("No password value found in k8s secret %s", usageID))
+		}
+		secretValue, err := base64.StdEncoding.DecodeString(string(secretBase64[:]))
+		if err != nil {
+			return goerror.New(fmt.Sprintf("Failed to base64 decode k8s secret %s", usageID))
+		}
+
+		d.domainManager.SyncVMSecret(vm, usageType, usageID, string(secretValue))
+	}
+
+	return nil
+}
+
 func (d *VMHandlerDispatch) processVmUpdate(vm *v1.VM, shouldDeleteVm bool) error {
 
 	if shouldDeleteVm {
+		// remove any defined libvirt secrets associated with this vm
+		err := d.domainManager.RemoveVMSecrets(vm)
+		if err != nil {
+			return err
+		}
+
 		// Since the VM was not in the cache, we delete it
 		return d.domainManager.KillVM(vm)
 	} else if isWorthSyncing(vm) == false {
@@ -312,6 +348,11 @@ func (d *VMHandlerDispatch) processVmUpdate(vm *v1.VM, shouldDeleteVm bool) erro
 		// Everything except shutting down the VM is not
 		// permitted when it is migrating.
 		return nil
+	}
+
+	err = d.addVmSecrets(vm)
+	if err != nil {
+		return err
 	}
 
 	// TODO check if found VM has the same UID like the domain,
