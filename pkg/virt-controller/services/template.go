@@ -47,12 +47,38 @@ func (t *templateService) RenderLaunchManifest(vm *v1.VM) (*kubev1.Pod, error) {
 	domain := precond.MustNotBeEmpty(vm.GetObjectMeta().GetName())
 	uid := precond.MustNotBeEmpty(string(vm.GetObjectMeta().GetUID()))
 
+	initialDelaySeconds := 5
+	timeoutSeconds := 5
+	periodSeconds := 10
+	successThreshold := 2
+	failureThreshold := 5
+
 	// VM target container
 	container := kubev1.Container{
 		Name:            "compute",
 		Image:           t.launcherImage,
 		ImagePullPolicy: kubev1.PullIfNotPresent,
-		Command:         []string{"/virt-launcher", "--qemu-timeout", "60s"},
+		Command: []string{"/virt-launcher",
+			"--qemu-timeout",
+			"60s",
+			"--readiness-file",
+			"/tmp/healthy",
+		},
+		ReadinessProbe: &kubev1.Probe{
+			Handler: kubev1.Handler{
+				Exec: &kubev1.ExecAction{
+					Command: []string{
+						"cat",
+						"/tmp/healthy",
+					},
+				},
+			},
+			InitialDelaySeconds: int32(initialDelaySeconds),
+			PeriodSeconds:       int32(periodSeconds),
+			TimeoutSeconds:      int32(timeoutSeconds),
+			SuccessThreshold:    int32(successThreshold),
+			FailureThreshold:    int32(failureThreshold),
+		},
 	}
 
 	containers, err := registrydisk.GenerateContainers(vm)
