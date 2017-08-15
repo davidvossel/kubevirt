@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"kubevirt.io/kubevirt/pkg/api/v1"
+	cloudinit "kubevirt.io/kubevirt/pkg/cloud-init"
 	"kubevirt.io/kubevirt/pkg/logging"
 	"kubevirt.io/kubevirt/pkg/precond"
 	registrydisk "kubevirt.io/kubevirt/pkg/registry-disk"
@@ -43,15 +44,25 @@ type templateService struct {
 
 //Deprecated: remove the service and just use a builder or contextcless helper function
 func (t *templateService) RenderLaunchManifest(vm *v1.VM) (*kubev1.Pod, error) {
+	var containers []kubev1.Container
+
 	precond.MustNotBeNil(vm)
 	domain := precond.MustNotBeEmpty(vm.GetObjectMeta().GetName())
+	namespace := precond.MustNotBeEmpty(vm.GetObjectMeta().GetNamespace())
 	uid := precond.MustNotBeEmpty(string(vm.GetObjectMeta().GetUID()))
+
+	cloudInitShare := cloudinit.GetDomainBasePath(domain, namespace)
 
 	initialDelaySeconds := 5
 	timeoutSeconds := 5
 	periodSeconds := 10
 	successThreshold := 2
 	failureThreshold := 5
+
+	envVars, err := cloudinit.GenerateEnvVars(vm)
+	if err != nil {
+		return nil, err
+	}
 
 	// VM target container
 	container := kubev1.Container{
@@ -79,13 +90,21 @@ func (t *templateService) RenderLaunchManifest(vm *v1.VM) (*kubev1.Pod, error) {
 			SuccessThreshold:    int32(successThreshold),
 			FailureThreshold:    int32(failureThreshold),
 		},
+		Env: envVars,
+		VolumeMounts: []kubev1.VolumeMount{
+			{
+				Name:      "cloud-init-dir",
+				MountPath: cloudInitShare,
+			},
+		},
 	}
 
-	containers, err := registrydisk.GenerateContainers(vm)
+	diskContainers, err := registrydisk.GenerateContainers(vm)
 	if err != nil {
 		return nil, err
 	}
 	containers = append(containers, container)
+	containers = append(containers, diskContainers...)
 
 	// TODO use constants for labels
 	pod := kubev1.Pod{
@@ -101,6 +120,16 @@ func (t *templateService) RenderLaunchManifest(vm *v1.VM) (*kubev1.Pod, error) {
 			RestartPolicy: kubev1.RestartPolicyNever,
 			Containers:    containers,
 			NodeSelector:  vm.Spec.NodeSelector,
+			Volumes: []kubev1.Volume{
+				{
+					Name: "cloud-init-dir",
+					VolumeSource: kubev1.VolumeSource{
+						HostPath: &kubev1.HostPathVolumeSource{
+							Path: cloudInitShare,
+						},
+					},
+				},
+			},
 		},
 	}
 

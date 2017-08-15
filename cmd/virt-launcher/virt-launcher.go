@@ -35,6 +35,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	cloudinit "kubevirt.io/kubevirt/pkg/cloud-init"
 	"kubevirt.io/kubevirt/pkg/logging"
 )
 
@@ -159,6 +160,11 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
+	err := cloudinit.GenerateLocalData()
+	if err != nil {
+		panic(err)
+	}
+
 	markReady(*readinessFile)
 	mon := Monitor{
 		exename:   "qemu",
@@ -166,6 +172,7 @@ func main() {
 	}
 
 	mon.RunForever(*qemuTimeout)
+	cloudinit.RemoveLocalData()
 }
 
 func readProcCmdline(pathname string) ([]string, error) {

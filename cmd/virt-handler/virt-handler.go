@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/tools/record"
 
 	"kubevirt.io/kubevirt/pkg/api/v1"
+	cloudinit "kubevirt.io/kubevirt/pkg/cloud-init"
 	"kubevirt.io/kubevirt/pkg/kubecli"
 	"kubevirt.io/kubevirt/pkg/logging"
 	"kubevirt.io/kubevirt/pkg/virt-handler"
@@ -56,6 +57,7 @@ func main() {
 	listen := flag.String("listen", "0.0.0.0", "Address where to listen on")
 	port := flag.Int("port", 8185, "Port to listen on")
 	host := flag.String("hostname-override", "", "Kubernetes Pod to monitor for changes")
+	cloudInitDir := flag.String("cloud-init-dir", "/var/run/libvirt/cloud-init-dir", "Base directory for ephemeral cloud init data")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
@@ -68,6 +70,8 @@ func main() {
 	}
 	log := logging.DefaultLogger()
 	log.Info().V(1).Log("hostname", *host)
+
+	cloudinit.SetLocalDirectory(*cloudInitDir)
 
 	go func() {
 		for {

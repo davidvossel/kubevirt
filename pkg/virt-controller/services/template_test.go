@@ -42,7 +42,7 @@ var _ = Describe("Template", func() {
 			It("should work", func() {
 
 				Expect(err).To(BeNil())
-				pod, err := svc.RenderLaunchManifest(&v1.VM{ObjectMeta: metav1.ObjectMeta{Name: "testvm", UID: "1234"}, Spec: v1.VMSpec{Domain: &v1.DomainSpec{}}})
+				pod, err := svc.RenderLaunchManifest(&v1.VM{ObjectMeta: metav1.ObjectMeta{Name: "testvm", Namespace: "fake", UID: "1234"}, Spec: v1.VMSpec{Domain: &v1.DomainSpec{}}})
 
 				Expect(err).To(BeNil())
 				Expect(pod.Spec.Containers[0].Image).To(Equal("kubevirt/virt-launcher"))
@@ -53,7 +53,7 @@ var _ = Describe("Template", func() {
 				}))
 				Expect(pod.ObjectMeta.GenerateName).To(Equal("virt-launcher-testvm-----"))
 				Expect(pod.Spec.NodeSelector).To(BeEmpty())
-				Expect(pod.Spec.Containers[0].Command).To(Equal([]string{"/virt-launcher", "--qemu-timeout", "60s"}))
+				Expect(pod.Spec.Containers[0].Command).To(Equal([]string{"/virt-launcher", "--qemu-timeout", "60s", "--readiness-file", "/tmp/healthy"}))
 			})
 		})
 		Context("with node selectors", func() {
@@ -62,7 +62,7 @@ var _ = Describe("Template", func() {
 				nodeSelector := map[string]string{
 					"kubernetes.io/hostname": "master",
 				}
-				vm := v1.VM{ObjectMeta: metav1.ObjectMeta{Name: "testvm", UID: "1234"}, Spec: v1.VMSpec{NodeSelector: nodeSelector, Domain: &v1.DomainSpec{}}}
+				vm := v1.VM{ObjectMeta: metav1.ObjectMeta{Name: "testvm", Namespace: "fake", UID: "1234"}, Spec: v1.VMSpec{NodeSelector: nodeSelector, Domain: &v1.DomainSpec{}}}
 
 				pod, err := svc.RenderLaunchManifest(&vm)
 
@@ -77,7 +77,7 @@ var _ = Describe("Template", func() {
 				Expect(pod.Spec.NodeSelector).To(Equal(map[string]string{
 					"kubernetes.io/hostname": "master",
 				}))
-				Expect(pod.Spec.Containers[0].Command).To(Equal([]string{"/virt-launcher", "--qemu-timeout", "60s"}))
+				Expect(pod.Spec.Containers[0].Command).To(Equal([]string{"/virt-launcher", "--qemu-timeout", "60s", "--readiness-file", "/tmp/healthy"}))
 			})
 		})
 		Context("migration", func() {
