@@ -53,7 +53,10 @@ type LibvirtDomainManager struct {
 }
 
 func NewLibvirtDomainManager(connection cli.Connection, recorder record.EventRecorder) (DomainManager, error) {
-	manager := LibvirtDomainManager{virConn: connection, recorder: recorder}
+	manager := LibvirtDomainManager{
+		virConn:  connection,
+		recorder: recorder,
+	}
 	return &manager, nil
 }
 
@@ -173,7 +176,6 @@ func (l *LibvirtDomainManager) KillVM(vm *v1.VM) error {
 		logging.DefaultLogger().Object(vm).Error().Reason(err).Msg("Undefining the domain state failed.")
 		return err
 	}
-
 	logging.DefaultLogger().Object(vm).Info().Msg("Domain undefined.")
 	l.recorder.Event(vm, kubev1.EventTypeNormal, v1.Deleted.String(), "VM undefined")
 	return nil

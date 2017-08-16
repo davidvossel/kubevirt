@@ -22,6 +22,7 @@ package registrydisk
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/jeevatkm/go-model"
 
@@ -35,6 +36,20 @@ const defaultIqn = "iqn.2017-01.io.kubevirt:wrapper/1"
 const defaultPort = 3261
 const defaultPortStr = "3261"
 const defaultHost = "127.0.0.1"
+
+func DisksAreReady(pod *kubev1.Pod) bool {
+	// Wait for readiness probes on image wrapper containers
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if strings.Contains(containerStatus.Name, "disk") == false {
+			// only check readiness of disk containers
+			continue
+		}
+		if containerStatus.Ready == false {
+			return false
+		}
+	}
+	return true
+}
 
 // The virt-handler converts registry disks to their corresponding iscsi network
 // disks when the VM spec is being defined as a domain with libvirt.

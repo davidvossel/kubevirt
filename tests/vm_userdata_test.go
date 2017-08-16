@@ -21,7 +21,6 @@ package tests_test
 
 import (
 	"flag"
-	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -30,7 +29,6 @@ import (
 
 	"kubevirt.io/kubevirt/pkg/api/v1"
 	"kubevirt.io/kubevirt/pkg/kubecli"
-	"kubevirt.io/kubevirt/pkg/virt-controller/services"
 	"kubevirt.io/kubevirt/tests"
 )
 
@@ -38,10 +36,7 @@ var _ = Describe("CloudInit UserData", func() {
 
 	flag.Parse()
 
-	coreClient, err := kubecli.Get()
-	tests.PanicOnError(err)
-
-	restClient, err := kubecli.GetRESTClient()
+	virtClient, err := kubecli.GetKubevirtClient()
 	tests.PanicOnError(err)
 
 	BeforeEach(func() {
@@ -49,7 +44,7 @@ var _ = Describe("CloudInit UserData", func() {
 	})
 
 	LaunchVM := func(vm *v1.VM) runtime.Object {
-		obj, err := restClient.Post().Resource("vms").Namespace(tests.NamespaceTestDefault).Body(vm).Do().Get()
+		obj, err := virtClient.RestClient().Post().Resource("vms").Namespace(tests.NamespaceTestDefault).Body(vm).Do().Get()
 		Expect(err).To(BeNil())
 		return obj
 	}
@@ -58,34 +53,6 @@ var _ = Describe("CloudInit UserData", func() {
 		_, ok := obj.(*v1.VM)
 		Expect(ok).To(BeTrue(), "Object is not of type *v1.VM")
 		tests.WaitForSuccessfulVMStart(obj)
-
-		// Verify Registry Disks are Online
-		pods, err := coreClient.CoreV1().Pods(tests.NamespaceTestDefault).List(services.UnfinishedVMPodSelector(vm))
-		Expect(err).To(BeNil())
-
-		computeFound := 0
-		for _, pod := range pods.Items {
-			if pod.ObjectMeta.DeletionTimestamp != nil {
-				continue
-			}
-			for _, containerStatus := range pod.Status.ContainerStatuses {
-				if strings.Contains(containerStatus.Name, "compute") == false {
-					continue
-				}
-				if containerStatus.Ready == false {
-					continue
-				}
-
-				// verify the cloud init share is mounted
-				for _, volume := range pod.Spec.Volumes {
-					if volume.Name == "cloud-init-dir" {
-						computeFound++
-					}
-				}
-			}
-			break
-		}
-		Expect(computeFound).To(Equal(1))
 	}
 
 	Context("CloudInit Data Source NoCloud", func() {

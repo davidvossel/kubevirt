@@ -202,7 +202,7 @@ var _ = Describe("Vmlifecycle", func() {
 				handlerName := pods.Items[0].GetObjectMeta().GetName()
 				handlerNamespace := pods.Items[0].GetObjectMeta().GetNamespace()
 				seconds := int64(120)
-				logsQuery := virtClient.CoreV1().Pods(handlerNamespace).GetLogs(handlerName, &k8sv1.PodLogOptions{SinceSeconds: &seconds})
+				logsQuery := virtClient.CoreV1().Pods(handlerNamespace).GetLogs(handlerName, &k8sv1.PodLogOptions{SinceSeconds: &seconds, Container: "virt-handler"})
 
 				// Make sure we schedule the VM to master
 				vm.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": primaryNodeName}

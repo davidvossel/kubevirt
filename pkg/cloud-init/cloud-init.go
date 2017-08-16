@@ -20,19 +20,20 @@
 package cloudinit
 
 import (
+	"bytes"
+	"crypto/md5"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"os/user"
 	"strconv"
 
-	kubev1 "k8s.io/api/core/v1"
-
 	"kubevirt.io/kubevirt/pkg/api/v1"
+	"kubevirt.io/kubevirt/pkg/logging"
 	"kubevirt.io/kubevirt/pkg/precond"
 )
 
@@ -44,6 +45,84 @@ const noCloudFile = "noCloud.iso"
 const (
 	dataSourceNoCloud = "noCloud"
 )
+
+func fileExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	exists := false
+
+	if err == nil {
+		exists = true
+	} else if os.IsNotExist(err) {
+		err = nil
+	}
+	return exists, err
+}
+
+func md5CheckSum(filePath string) ([]byte, error) {
+	var result []byte
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return result, err
+	}
+	defer file.Close()
+
+	hash := md5.New()
+	_, err = io.Copy(hash, file)
+
+	if err != nil {
+		return result, err
+	}
+
+	result = hash.Sum(result)
+	return result, nil
+}
+
+func setFileOwnership(username string, file string) error {
+	usrObj, err := user.Lookup(username)
+	if err != nil {
+		return err
+	}
+
+	uid, err := strconv.Atoi(usrObj.Uid)
+	if err != nil {
+		return err
+	}
+
+	gid, err := strconv.Atoi(usrObj.Gid)
+	if err != nil {
+		return err
+	}
+
+	return os.Chown(file, uid, gid)
+}
+
+func filesAreEqual(path1 string, path2 string) (bool, error) {
+	exists, err := fileExists(path1)
+	if err != nil {
+		return false, err
+	} else if exists == false {
+		return false, nil
+	}
+
+	exists, err = fileExists(path2)
+	if err != nil {
+		return false, err
+	} else if exists == false {
+		return false, nil
+	}
+
+	sum1, err := md5CheckSum(path1)
+	if err != nil {
+		return false, err
+	}
+	sum2, err := md5CheckSum(path2)
+	if err != nil {
+		return false, err
+	}
+
+	return bytes.Equal(sum1, sum2), nil
+}
 
 func SetLocalDirectory(dir string) {
 	cloudInitLocalDir = dir
@@ -63,7 +142,7 @@ func InjectDomainData(vm *v1.VM) (*v1.VM, error) {
 		return vm, nil
 	}
 
-	err := ValidateArgs(vm)
+	err := ValidateArgs(vm.Spec.CloudInit)
 	if err != nil {
 		return vm, err
 	}
@@ -93,27 +172,27 @@ func InjectDomainData(vm *v1.VM) (*v1.VM, error) {
 	return vm, nil
 }
 
-func ValidateArgs(vm *v1.VM) error {
-	if vm.Spec.CloudInit == nil {
+func ValidateArgs(spec *v1.CloudInitSpec) error {
+	if spec == nil {
 		return nil
 	}
 
-	switch vm.Spec.CloudInit.DataSource {
+	switch spec.DataSource {
 	case dataSourceNoCloud:
-		if vm.Spec.CloudInit.NoCloudData == nil {
-			return errors.New(fmt.Sprintf("DataSource %s does not have the required data initialized", vm.Spec.CloudInit.DataSource))
+		if spec.NoCloudData == nil {
+			return errors.New(fmt.Sprintf("DataSource %s does not have the required data initialized", spec.DataSource))
 		}
-		if vm.Spec.CloudInit.NoCloudData.UserDataBase64 == "" {
-			return errors.New(fmt.Sprintf("userDataBase64 is required for cloudInit type %s", vm.Spec.CloudInit.DataSource))
+		if spec.NoCloudData.UserDataBase64 == "" {
+			return errors.New(fmt.Sprintf("userDataBase64 is required for cloudInit type %s", spec.DataSource))
 		}
-		if vm.Spec.CloudInit.NoCloudData.MetaDataBase64 == "" {
-			return errors.New(fmt.Sprintf("metaDataBase64 is required for cloudInit type %s", vm.Spec.CloudInit.DataSource))
+		if spec.NoCloudData.MetaDataBase64 == "" {
+			return errors.New(fmt.Sprintf("metaDataBase64 is required for cloudInit type %s", spec.DataSource))
 		}
-		if vm.Spec.CloudInit.NoCloudData.DiskTarget == "" {
-			return errors.New(fmt.Sprintf("noCloudTarget is required for cloudInit type %s", vm.Spec.CloudInit.DataSource))
+		if spec.NoCloudData.DiskTarget == "" {
+			return errors.New(fmt.Sprintf("noCloudTarget is required for cloudInit type %s", spec.DataSource))
 		}
 	default:
-		return errors.New(fmt.Sprintf("Unknown CloudInit dataSource %s", vm.Spec.CloudInit.DataSource))
+		return errors.New(fmt.Sprintf("Unknown CloudInit dataSource %s", spec.DataSource))
 	}
 
 	return nil
@@ -132,42 +211,36 @@ func ApplyMetadata(vm *v1.VM) {
 	vm.Spec.CloudInit.NoCloudData.MetaDataBase64 = base64.StdEncoding.EncodeToString([]byte(msg))
 }
 
-// This function removes any local data associated with cloud-init
-// Not all cloud-init types require local data.
-func RemoveLocalData() {
-	dataSource := os.Getenv("CLOUD_INIT_DS")
-	if dataSource == "" {
-		return
-	}
-
-	switch dataSource {
-	case dataSourceNoCloud:
-		domainBasePath := os.Getenv("NO_CLOUD_BASE_PATH")
-		metaFile := fmt.Sprintf("%s/%s", domainBasePath, "meta-data")
-		userFile := fmt.Sprintf("%s/%s", domainBasePath, "user-data")
-		iso := fmt.Sprintf("%s/%s", domainBasePath, os.Getenv("NO_CLOUD_FILE"))
-
-		os.Remove(metaFile)
-		os.Remove(userFile)
-		os.Remove(iso)
-		log.Printf("Removed nocloud local data files")
-	}
+func RemoveLocalData(domain string, namespace string) {
+	domainBasePath := GetDomainBasePath(domain, namespace)
+	os.RemoveAll(domainBasePath)
 }
 
-func GenerateLocalData() error {
-	dataSource := os.Getenv("CLOUD_INIT_DS")
-	if dataSource == "" {
+func GenerateLocalData(domain string, namespace string, spec *v1.CloudInitSpec) error {
+	if spec == nil {
 		return nil
 	}
 
-	switch dataSource {
+	err := ValidateArgs(spec)
+	if err != nil {
+		return err
+	}
+
+	domainBasePath := GetDomainBasePath(domain, namespace)
+	os.MkdirAll(domainBasePath, 0755)
+
+	switch spec.DataSource {
 	case dataSourceNoCloud:
-		domainBasePath := os.Getenv("NO_CLOUD_BASE_PATH")
 		metaFile := fmt.Sprintf("%s/%s", domainBasePath, "meta-data")
 		userFile := fmt.Sprintf("%s/%s", domainBasePath, "user-data")
-		iso := fmt.Sprintf("%s/%s", domainBasePath, os.Getenv("NO_CLOUD_FILE"))
-		userData64 := os.Getenv("USER_DATA_BASE64")
-		metaData64 := os.Getenv("META_DATA_BASE64")
+		iso := fmt.Sprintf("%s/%s", domainBasePath, noCloudFile)
+		isoStaging := fmt.Sprintf("%s/%s.staging", domainBasePath, noCloudFile)
+		userData64 := spec.NoCloudData.UserDataBase64
+		metaData64 := spec.NoCloudData.MetaDataBase64
+
+		os.Remove(userFile)
+		os.Remove(metaFile)
+		os.Remove(isoStaging)
 
 		userDataBytes, err := base64.StdEncoding.DecodeString(userData64)
 		if err != nil {
@@ -187,10 +260,9 @@ func GenerateLocalData() error {
 			return err
 		}
 
-		//genisoimage -output $ISO -volid cidata -joliet -rock $USER_DATA $META_DATA
 		cmd := exec.Command("genisoimage",
 			"-output",
-			iso,
+			isoStaging,
 			"-volid",
 			"cidata",
 			"-joliet",
@@ -199,71 +271,31 @@ func GenerateLocalData() error {
 			metaFile)
 
 		err = cmd.Run()
-		if err != nil {
-			return err
-		}
-
-		qemuUser, err := user.Lookup("qemu")
-		if err != nil {
-			return err
-		}
-
-		uid, err := strconv.Atoi(qemuUser.Uid)
-		if err != nil {
-			return err
-		}
-
-		gid, err := strconv.Atoi(qemuUser.Gid)
-		if err != nil {
-			return err
-		}
-
-		os.Chown(iso, uid, gid)
 		os.Remove(metaFile)
 		os.Remove(userFile)
+		if err != nil {
+			return err
+		}
 
-		log.Printf("Generated nocloud iso file %s", iso)
+		err = setFileOwnership("qemu", isoStaging)
+		if err != nil {
+			return err
+		}
+
+		isEqual, err := filesAreEqual(iso, isoStaging)
+		if err != nil {
+			return err
+		}
+
+		// Only replace the dynamically generated iso if it has a different checksum
+		if isEqual {
+			os.Remove(isoStaging)
+		} else {
+			os.Remove(iso)
+			os.Rename(isoStaging, iso)
+		}
+
+		logging.DefaultLogger().Info().Msg(fmt.Sprintf("generated nocloud iso file %s", iso))
 	}
 	return nil
-}
-
-func GenerateEnvVars(vm *v1.VM) ([]kubev1.EnvVar, error) {
-	namespace := precond.MustNotBeEmpty(vm.GetObjectMeta().GetNamespace())
-	domain := precond.MustNotBeEmpty(vm.GetObjectMeta().GetName())
-	var containerVars []kubev1.EnvVar
-
-	if vm.Spec.CloudInit == nil {
-		return containerVars, nil
-	}
-
-	err := ValidateArgs(vm)
-	if err != nil {
-		return containerVars, err
-	}
-
-	switch vm.Spec.CloudInit.DataSource {
-	case dataSourceNoCloud:
-		filePath := GetDomainBasePath(domain, namespace)
-		containerVars = append(containerVars, kubev1.EnvVar{
-			Name:  "CLOUD_INIT_DS",
-			Value: dataSourceNoCloud,
-		})
-		containerVars = append(containerVars, kubev1.EnvVar{
-			Name:  "NO_CLOUD_BASE_PATH",
-			Value: filePath,
-		})
-		containerVars = append(containerVars, kubev1.EnvVar{
-			Name:  "NO_CLOUD_FILE",
-			Value: noCloudFile,
-		})
-		containerVars = append(containerVars, kubev1.EnvVar{
-			Name:  "USER_DATA_BASE64",
-			Value: vm.Spec.CloudInit.NoCloudData.UserDataBase64,
-		})
-		containerVars = append(containerVars, kubev1.EnvVar{
-			Name:  "META_DATA_BASE64",
-			Value: vm.Spec.CloudInit.NoCloudData.MetaDataBase64,
-		})
-	}
-	return containerVars, nil
 }

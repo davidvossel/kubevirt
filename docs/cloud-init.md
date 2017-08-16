@@ -66,12 +66,9 @@ spec:
 ```
 ### NoCloud Implementation Details
 
-Internally, kubevirt passes the NoCloud userdata and metadata as environment
-varialbes to the VM's corresponding virt-launcher component.
-
-The virt-launcher process generates the NoCloud iso file and places that file
-on a host path that is shared by both the virt-launcher container and the
-libvirt container.
+Internally, kubevirt passes the cloud-init spec to the virt-config-disk
+component. That component generates the iso files associated with the
+nocloud datasource.
 
 When the VM starts, virt-handler injects the NoCloud iso as a file based disk
 that the VM consumes.

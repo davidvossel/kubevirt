@@ -230,8 +230,9 @@ func (c *VMController) execute(key string) error {
 			return nil
 		}
 
-		if verifyReadiness(&pods.Items[0]) == false {
-			logger.Info().V(2).Msg("Waiting on all containers to be marked ready")
+		// Ensure registry disks are online before placing VM
+		if registrydisk.DisksAreReady(&pods.Items[0]) == false {
+			logger.Info().V(2).Msg("Waiting on image wrapper disks to become ready.")
 			return nil
 		}
 
@@ -254,16 +255,6 @@ func (c *VMController) execute(key string) error {
 		logger.Info().Msgf("VM successfully scheduled to %s.", vmCopy.Status.NodeName)
 	}
 	return nil
-}
-
-func verifyReadiness(pod *k8sv1.Pod) bool {
-	for _, containerStatus := range pod.Status.ContainerStatuses {
-		if containerStatus.Ready == false {
-			return false
-		}
-	}
-
-	return true
 }
 
 func vmLabelHandler(vmQueue workqueue.RateLimitingInterface) func(obj interface{}) {
