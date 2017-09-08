@@ -116,7 +116,7 @@ func main() {
 		panic(err)
 	}
 
-	configDiskClient := configdisk.NewConfigDiskClient()
+	configDiskClient := configdisk.NewConfigDiskClient(virtCli)
 
 	// Wire VM controller
 	vmListWatcher := kubecli.NewListWatchFromClient(virtCli.RestClient(), "vms", k8sv1.NamespaceAll, fields.Everything(), l)
