@@ -83,6 +83,7 @@ func (c *configDiskClient) Define(vm *v1.VM) (bool, error) {
 				return
 			}
 
+			cloudinit.ApplyMetadata(cloudInitSpec, vm)
 			err = cloudinit.GenerateLocalData(domain, namespace, cloudInitSpec)
 			if err != nil {
 				v <- fmt.Sprintf("config-disk failure: %v", err)

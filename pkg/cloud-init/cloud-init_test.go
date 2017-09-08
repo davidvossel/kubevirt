@@ -165,7 +165,7 @@ var _ = Describe("CloudInit", func() {
 
 				vm.Spec.Domain.Devices.Disks = append(vm.Spec.Domain.Devices.Disks, newDisk)
 
-				ApplyMetadata(vm)
+				ApplyMetadata(spec, vm)
 				Expect(vm.Spec.Domain.Devices.Disks[0].CloudInit.NoCloudData.MetaDataBase64).To(Equal(metaData64))
 			})
 
@@ -187,7 +187,7 @@ var _ = Describe("CloudInit", func() {
 
 				vm.Spec.Domain.Devices.Disks = append(vm.Spec.Domain.Devices.Disks, newDisk)
 
-				ApplyMetadata(vm)
+				ApplyMetadata(spec, vm)
 				Expect(vm.Spec.Domain.Devices.Disks[0].CloudInit.NoCloudData.MetaDataBase64).ToNot(Equal(""))
 			})
 			It("Verify listing VMs based on local nocloud data", func() {
