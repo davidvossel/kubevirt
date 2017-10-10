@@ -22,6 +22,7 @@ package inotifyinformer
 import (
 	"io/ioutil"
 	"os"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -65,7 +66,25 @@ var _ = Describe("Inotify", func() {
 			return false
 		}
 
-		BeforeEach(func() {
+		startWatchdogInformer := func() {
+			var err error
+			stopInformer = make(chan struct{})
+			tmpDir, err = ioutil.TempDir("", "kubevirt")
+			Expect(err).ToNot(HaveOccurred())
+
+			queue = workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			informer = cache.NewSharedIndexInformer(
+				NewWatchdogFileListWatchFromClient(tmpDir, 1),
+				&api.Domain{},
+				0,
+				cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+			informer.AddEventHandler(controller.NewResourceEventHandlerFuncsForWorkqueue(queue))
+			go informer.Run(stopInformer)
+			Expect(cache.WaitForCacheSync(stopInformer, informer.HasSynced)).To(BeTrue())
+		}
+
+		startInformer := func() {
 			var err error
 			stopInformer = make(chan struct{})
 			tmpDir, err = ioutil.TempDir("", "kubevirt")
@@ -86,9 +105,36 @@ var _ = Describe("Inotify", func() {
 			go informer.Run(stopInformer)
 			Expect(cache.WaitForCacheSync(stopInformer, informer.HasSynced)).To(BeTrue())
 
+		}
+
+		It("should detect expired watchdog files", func() {
+			startWatchdogInformer()
+
+			keyExpired := "default/expiredvm"
+			fileName := tmpDir + "/default_expiredvm"
+			Expect(os.Create(fileName)).ToNot(BeNil())
+			Expect(TestForKeyEvent(keyExpired, true)).To(Equal(true))
+
+			files, err := detectExpiredFiles(1, tmpDir)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(files)).To(Equal(0))
+
+			time.Sleep(time.Second * 3)
+
+			Expect(TestForKeyEvent(keyExpired, true)).To(Equal(true))
+
+			files, err = detectExpiredFiles(1, tmpDir)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(files)).To(Equal(1))
+
+			Expect(os.Create(fileName)).ToNot(BeNil())
+			files, err = detectExpiredFiles(1, tmpDir)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(files)).To(Equal(0))
 		})
 
 		It("should update the cache with all files in the directory", func() {
+			startInformer()
 			Expect(informer.GetStore().ListKeys()).To(HaveLen(2))
 			_, exists, _ := informer.GetStore().GetByKey("default/testvm")
 			Expect(exists).To(BeTrue())
@@ -97,6 +143,7 @@ var _ = Describe("Inotify", func() {
 		})
 
 		It("should detect multiple creations and deletions", func() {
+			startInformer()
 			num := 5
 			key := "default2/test.vm2"
 			fileName := tmpDir + "/" + "default2_test.vm2"
@@ -113,6 +160,7 @@ var _ = Describe("Inotify", func() {
 
 		Context("and something goes wrong", func() {
 			It("should notify and abort when listing files", func() {
+				startInformer()
 				lw := NewFileListWatchFromClient(tmpDir)
 				// Deleting the watch directory should have some impact
 				Expect(os.RemoveAll(tmpDir)).To(Succeed())
@@ -120,6 +168,7 @@ var _ = Describe("Inotify", func() {
 				Expect(err).To(HaveOccurred())
 			})
 			It("should ignore invalid file content", func() {
+				startInformer()
 				lw := NewFileListWatchFromClient(tmpDir)
 				_, err := lw.List(v1.ListOptions{})
 				Expect(err).ToNot(HaveOccurred())
