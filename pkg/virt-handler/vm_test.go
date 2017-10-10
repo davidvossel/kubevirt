@@ -59,9 +59,14 @@ var _ = Describe("VM", func() {
 
 	var recorder record.EventRecorder
 
+	var shareDir string
+
 	logging.DefaultLogger().SetIOWriter(GinkgoWriter)
 
 	BeforeEach(func() {
+		shareDir, err := ioutil.TempDir("", "kubevirt-share")
+		Expect(err).ToNot(HaveOccurred())
+
 		server = ghttp.NewServer()
 		host := ""
 
@@ -79,7 +84,7 @@ var _ = Describe("VM", func() {
 		configDiskClient := configdisk.NewConfigDiskClient(virtClient)
 
 		recorder = record.NewFakeRecorder(100)
-		dispatch = NewVMHandlerDispatch(domainManager, recorder, restClient, virtClient, host, configDiskClient)
+		dispatch = NewVMHandlerDispatch(domainManager, recorder, restClient, virtClient, host, configDiskClient, shareDir, 1)
 
 	})
 
@@ -136,6 +141,7 @@ var _ = Describe("VM", func() {
 	AfterEach(func() {
 		server.Close()
 		ctrl.Finish()
+		os.RemoveAll(shareDir)
 	})
 })
 

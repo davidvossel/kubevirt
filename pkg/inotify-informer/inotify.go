@@ -25,7 +25,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,17 +61,6 @@ func NewFileListWatchFromClient(fileDir string) cache.ListerWatcher {
 	return d
 }
 
-func NewWatchdogFileListWatchFromClient(fileDir string, watchdogIntervalSeconds int) cache.ListerWatcher {
-
-	d := &DirectoryListWatcher{
-		fileDir:                  fileDir,
-		backgroundWatcherStarted: false,
-		isWatchdog:               true,
-		watchdogIntervalSeconds:  watchdogIntervalSeconds,
-	}
-	return d
-}
-
 type DirectoryListWatcher struct {
 	lock                     sync.Mutex
 	wg                       sync.WaitGroup
@@ -80,10 +68,7 @@ type DirectoryListWatcher struct {
 	watcher                  *fsnotify.Watcher
 	stopChan                 chan struct{}
 	eventChan                chan watch.Event
-	watchDogTicker           <-chan time.Time
 	backgroundWatcherStarted bool
-	isWatchdog               bool
-	watchdogIntervalSeconds  int
 }
 
 func splitFileNamespaceName(fullPath string) (namespace string, domain string, err error) {
@@ -98,24 +83,6 @@ func splitFileNamespaceName(fullPath string) (namespace string, domain string, e
 	return namespace, domain, nil
 }
 
-func detectExpiredFiles(expiredSeconds int, fileDir string) ([]string, error) {
-	var expiredFiles []string
-	files, err := ioutil.ReadDir(fileDir)
-	if err != nil {
-		return nil, err
-	}
-	now := time.Now().UTC().Unix()
-	for _, file := range files {
-		mod := file.ModTime().UTC().Unix()
-		diff := now - mod
-
-		if diff > int64(expiredSeconds) {
-			expiredFiles = append(expiredFiles, file.Name())
-		}
-	}
-	return expiredFiles, nil
-}
-
 func (d *DirectoryListWatcher) startBackground() error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
@@ -127,13 +94,6 @@ func (d *DirectoryListWatcher) startBackground() error {
 
 	d.stopChan = make(chan struct{}, 1)
 	d.eventChan = make(chan watch.Event, 100)
-
-	if d.isWatchdog {
-		d.watchDogTicker = time.NewTicker(time.Duration(d.watchdogIntervalSeconds) * time.Second).C
-	} else {
-		// just make a no-op channel if this is not in watchdog mode
-		d.watchDogTicker = make(<-chan time.Time)
-	}
 
 	d.watcher, err = fsnotify.NewWatcher()
 	if err != nil {
@@ -149,36 +109,35 @@ func (d *DirectoryListWatcher) startBackground() error {
 	go func() {
 		defer d.wg.Done()
 		for {
-			var e watch.EventType
 			var fse fsnotify.Event
+
 			select {
 			case <-d.stopChan:
 				d.watcher.Close()
 				return
 			case event := <-d.watcher.Events:
+				var e watch.EventType
+				sendEvent := false
+
 				fse = event
 				switch event.Op {
 				case fsnotify.Create:
 					e = watch.Added
+					sendEvent = true
+
 				case fsnotify.Remove:
 					e = watch.Deleted
-				}
-			case <-d.watchDogTicker:
-				expiredKeys, err := detectExpiredFiles(2*d.watchdogIntervalSeconds, d.fileDir)
-				if err != nil {
-					logging.DefaultLogger().Error().Reason(err).Msg("Invalid content detected during watchdog tick, ignoring and continuing.")
-					continue
+					sendEvent = true
 				}
 
-				for _, key := range expiredKeys {
-					namespace, name, err := splitFileNamespaceName(key)
+				if sendEvent {
+					namespace, name, err := splitFileNamespaceName(fse.Name)
 					if err != nil {
-						logging.DefaultLogger().Error().Reason(err).Msg("Invalid content detected during watchdog tick, ignoring and continuing.")
+						logging.DefaultLogger().Error().Reason(err).Msgf("Invalid content detected (%s), ignoring and continuing.", fse.Name)
 						continue
 					}
-					d.eventChan <- watch.Event{Type: watch.Modified, Object: api.NewMinimalDomainWithNS(namespace, name)}
+					d.eventChan <- watch.Event{Type: e, Object: api.NewMinimalDomainWithNS(namespace, name)}
 				}
-
 			case err := <-d.watcher.Errors:
 				d.eventChan <- watch.Event{
 					Type: watch.Error,
@@ -187,12 +146,6 @@ func (d *DirectoryListWatcher) startBackground() error {
 					},
 				}
 			}
-			namespace, name, err := splitFileNamespaceName(fse.Name)
-			if err != nil {
-				logging.DefaultLogger().Error().Reason(err).Msg("Invalid content detected, ignoring and continuing.")
-				continue
-			}
-			d.eventChan <- watch.Event{Type: e, Object: api.NewMinimalDomainWithNS(namespace, name)}
 		}
 	}()
 

@@ -17,15 +17,15 @@
  *
  */
 
-package inotifyinformer
+package watchdog
 
 import (
 	"io/ioutil"
 	"os"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
@@ -65,19 +65,15 @@ var _ = Describe("Inotify", func() {
 			return false
 		}
 
-		startInformer := func() {
+		startWatchdogInformer := func() {
 			var err error
 			stopInformer = make(chan struct{})
 			tmpDir, err = ioutil.TempDir("", "kubevirt")
 			Expect(err).ToNot(HaveOccurred())
 
-			// create two files
-			Expect(os.Create(tmpDir + "/" + "default_testvm")).ToNot(BeNil())
-			Expect(os.Create(tmpDir + "/" + "default1_testvm1")).ToNot(BeNil())
-
 			queue = workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 			informer = cache.NewSharedIndexInformer(
-				NewFileListWatchFromClient(tmpDir),
+				NewWatchdogListWatchFromClient(tmpDir, 1),
 				&api.Domain{},
 				0,
 				cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
@@ -85,60 +81,31 @@ var _ = Describe("Inotify", func() {
 			informer.AddEventHandler(controller.NewResourceEventHandlerFuncsForWorkqueue(queue))
 			go informer.Run(stopInformer)
 			Expect(cache.WaitForCacheSync(stopInformer, informer.HasSynced)).To(BeTrue())
-
 		}
 
-		It("should update the cache with all files in the directory", func() {
-			startInformer()
-			Expect(informer.GetStore().ListKeys()).To(HaveLen(2))
-			_, exists, _ := informer.GetStore().GetByKey("default/testvm")
-			Expect(exists).To(BeTrue())
-			_, exists, _ = informer.GetStore().GetByKey("default1/testvm1")
-			Expect(exists).To(BeTrue())
-		})
+		It("should detect expired watchdog files", func() {
+			startWatchdogInformer()
 
-		It("should detect multiple creations and deletions", func() {
-			startInformer()
-			num := 5
-			key := "default2/test.vm2"
-			fileName := tmpDir + "/" + "default2_test.vm2"
+			keyExpired := "default/expiredvm"
+			fileName := tmpDir + "/default_expiredvm"
+			Expect(os.Create(fileName)).ToNot(BeNil())
 
-			for i := 0; i < num; i++ {
-				Expect(os.Create(fileName)).ToNot(BeNil())
-				Expect(TestForKeyEvent(key, true)).To(Equal(true))
+			files, err := detectExpiredFiles(1, tmpDir)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(files)).To(Equal(0))
 
-				Expect(os.Remove(fileName)).To(Succeed())
-				Expect(TestForKeyEvent(key, false)).To(Equal(true))
-			}
+			time.Sleep(time.Second * 3)
 
-		})
+			Expect(TestForKeyEvent(keyExpired, true)).To(Equal(true))
 
-		Context("and something goes wrong", func() {
-			It("should notify and abort when listing files", func() {
-				startInformer()
-				lw := NewFileListWatchFromClient(tmpDir)
-				// Deleting the watch directory should have some impact
-				Expect(os.RemoveAll(tmpDir)).To(Succeed())
-				_, err := lw.List(v1.ListOptions{})
-				Expect(err).To(HaveOccurred())
-			})
-			It("should ignore invalid file content", func() {
-				startInformer()
-				lw := NewFileListWatchFromClient(tmpDir)
-				_, err := lw.List(v1.ListOptions{})
-				Expect(err).ToNot(HaveOccurred())
+			files, err = detectExpiredFiles(1, tmpDir)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(files)).To(Equal(1))
 
-				i, err := lw.Watch(v1.ListOptions{})
-				Expect(err).ToNot(HaveOccurred())
-				defer i.Stop()
-
-				// Adding files in wrong formats should have an impact
-				// TODO should we just ignore them?
-				Expect(os.Create(tmpDir + "/" + "test")).ToNot(BeNil())
-
-				// No event should be received
-				Consistently(i.ResultChan()).ShouldNot(Receive())
-			})
+			Expect(os.Create(fileName)).ToNot(BeNil())
+			files, err = detectExpiredFiles(1, tmpDir)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(files)).To(Equal(0))
 		})
 
 		AfterEach(func() {
