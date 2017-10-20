@@ -45,8 +45,36 @@ import (
 	registrydisk "kubevirt.io/kubevirt/pkg/registry-disk"
 	"kubevirt.io/kubevirt/pkg/virt-handler/virtwrap"
 	"kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/api"
+	virtlauncher "kubevirt.io/kubevirt/pkg/virt-launcher"
 	watchdog "kubevirt.io/kubevirt/pkg/watchdog"
 )
+
+type updateType int
+
+const (
+	// This means the VM object has been deleted from the cluster
+	updateTypeDeletion updateType = iota
+	// This means the VM's corresponding virt-launcher watchdog has expired
+	updateTypeWatchdogExpire
+	// This means something has triggered graceful shutdown of the VM
+	updateTypeGracefulShutdown
+	// This is a normal update that occurs during the VM launch flow
+	updateTypeNormal
+)
+
+func (p updateType) String() string {
+	switch p {
+	case updateTypeDeletion:
+		return "Deletion"
+	case updateTypeWatchdogExpire:
+		return "WatchdogExpire"
+	case updateTypeGracefulShutdown:
+		return "GracefulShutdown"
+	case updateTypeNormal:
+		return "NormalUpdate"
+	}
+	return "Unknown"
+}
 
 func NewVMController(lw cache.ListerWatcher,
 	domainManager virtwrap.DomainManager,
@@ -168,7 +196,7 @@ func (d *VMHandlerDispatch) updateVMStatus(vm *v1.VirtualMachine, cfg *api.Domai
 
 func (d *VMHandlerDispatch) Execute(store cache.Store, queue workqueue.RateLimitingInterface, key interface{}) {
 
-	shouldDeleteVm := false
+	processUpdateType := updateTypeNormal
 
 	// Fetch the latest Vm state from cache
 	obj, exists, err := store.GetByKey(key.(string))
@@ -192,8 +220,9 @@ func (d *VMHandlerDispatch) Execute(store cache.Store, queue workqueue.RateLimit
 		vm = obj.(*v1.VirtualMachine)
 	}
 
-	// Check For Migration before processing vm not in our cache
+	// Determine if the VM should be processed as deleted
 	if !exists {
+		// Check For Migration before processing vm not in our cache
 		// If we don't have the VM in the cache, it could be that it is currently migrating to us
 		isDestination, err := d.isMigrationDestination(vm.GetObjectMeta().GetNamespace(), vm.GetObjectMeta().GetName())
 		if err != nil {
@@ -208,14 +237,15 @@ func (d *VMHandlerDispatch) Execute(store cache.Store, queue workqueue.RateLimit
 			return
 		}
 		// The VM is deleted on the cluster, continue with processing the deletion on the host.
-		shouldDeleteVm = true
+		processUpdateType = updateTypeDeletion
 	}
 
-	watchdogExpired, _ := watchdog.WatchdogFileIsExpired(d.watchdogTimeoutSeconds, d.virtShareDir, vm)
+	// Determine if VM's watchdog has expired
+	watchdogExpired, err := watchdog.WatchdogFileIsExpired(d.watchdogTimeoutSeconds, d.virtShareDir, vm)
 	if watchdogExpired {
 		if vm.IsRunning() {
 			log.Log.V(2).Object(vm).Info("Detected expired watchdog file for running VM.")
-			shouldDeleteVm = true
+			processUpdateType = updateTypeWatchdogExpire
 		} else if vm.IsFinal() {
 			err = watchdog.WatchdogFileRemove(d.virtShareDir, vm)
 			if err != nil {
@@ -225,10 +255,33 @@ func (d *VMHandlerDispatch) Execute(store cache.Store, queue workqueue.RateLimit
 		}
 	}
 
-	log.Log.Object(vm).V(3).Info("Processing VM update.")
+	// Determine if VM needs to be gracefully shutdown
+	if exists && vm.IsRunning() {
+		gracefulShutdown, err := virtlauncher.VmHasGracefulShutdownTrigger(d.virtShareDir, vm)
+		if err != nil {
+			queue.AddRateLimited(key)
+			return
+		}
+		if gracefulShutdown && vm.IsRunning() {
+			processUpdateType = updateTypeGracefulShutdown
+		}
+	}
 
+	log.Log.Object(vm).V(3).Infof("Processing VM update of type %s", processUpdateType.String())
+
+	isPending := false
 	// Process the VM
-	isPending, err := d.processVmUpdate(vm, shouldDeleteVm)
+	switch processUpdateType {
+	case updateTypeDeletion:
+		isPending, err = d.handleDeletion(vm)
+	case updateTypeWatchdogExpire:
+		isPending, err = d.handleWatchdogExpire(vm)
+	case updateTypeGracefulShutdown:
+		isPending, err = d.handleGracefulShutdown(vm)
+	case updateTypeNormal:
+		isPending, err = d.handleNormalUpdate(vm)
+	}
+
 	if err != nil {
 		// Something went wrong, reenqueue the item with a delay
 		log.Log.Object(vm).Reason(err).Error("Synchronizing the VM failed.")
@@ -237,7 +290,7 @@ func (d *VMHandlerDispatch) Execute(store cache.Store, queue workqueue.RateLimit
 		return
 	} else if isPending {
 		// waiting on an async action to complete
-		log.Log.Object(vm).V(3).Reason(err).Info("Synchronizing is in a pending state.")
+		log.Log.Object(vm).V(3).Info("Synchronizing is in a pending state.")
 		queue.AddAfter(key, 1*time.Second)
 		queue.Forget(key)
 		return
@@ -408,33 +461,54 @@ func (d *VMHandlerDispatch) injectDiskAuth(vm *v1.VirtualMachine) (*v1.VirtualMa
 	return vm, nil
 }
 
-func (d *VMHandlerDispatch) processVmUpdate(vm *v1.VirtualMachine, shouldDeleteVm bool) (bool, error) {
+func (d *VMHandlerDispatch) handleDeletion(vm *v1.VirtualMachine) (bool, error) {
+	// Since the VM was not in the cache, we delete it
+	err := d.domainManager.KillVM(vm)
+	if err != nil {
+		return false, err
+	}
 
-	if shouldDeleteVm {
-		// Since the VM was not in the cache, we delete it
-		err := d.domainManager.KillVM(vm)
-		if err != nil {
-			return false, err
-		}
+	// remove any defined libvirt secrets associated with this vm
+	err = d.domainManager.RemoveVMSecrets(vm)
+	if err != nil {
+		return false, err
+	}
 
-		// remove any defined libvirt secrets associated with this vm
-		err = d.domainManager.RemoveVMSecrets(vm)
-		if err != nil {
-			return false, err
-		}
+	err = registrydisk.CleanupEphemeralDisks(vm)
+	if err != nil {
+		return false, err
+	}
 
-		err = registrydisk.CleanupEphemeralDisks(vm)
-		if err != nil {
-			return false, err
-		}
+	err = watchdog.WatchdogFileRemove(d.virtShareDir, vm)
+	if err != nil {
+		return false, err
+	}
 
-		err = watchdog.WatchdogFileRemove(d.virtShareDir, vm)
-		if err != nil {
-			return false, err
-		}
+	err = virtlauncher.VmGracefulShutdownTriggerClear(d.virtShareDir, vm)
+	if err != nil {
+		return false, err
+	}
 
-		return false, d.configDisk.Undefine(vm)
-	} else if isWorthSyncing(vm) == false {
+	return false, d.configDisk.Undefine(vm)
+
+}
+
+func (d *VMHandlerDispatch) handleWatchdogExpire(vm *v1.VirtualMachine) (bool, error) {
+	log.Log.Object(vm).Info("Processing expired watchdog")
+	return d.handleDeletion(vm)
+}
+
+func (d *VMHandlerDispatch) handleGracefulShutdown(vm *v1.VirtualMachine) (bool, error) {
+	log.Log.Object(vm).Info("Requesting shutdown due to graceful shutdown trigger")
+	err := d.domainManager.SignalShutdownVM(vm)
+	if err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
+func (d *VMHandlerDispatch) handleNormalUpdate(vm *v1.VirtualMachine) (bool, error) {
+	if isWorthSyncing(vm) == false {
 		// nothing to do here.
 		return false, nil
 	}
@@ -492,7 +566,12 @@ func (d *VMHandlerDispatch) processVmUpdate(vm *v1.VirtualMachine, shouldDeleteV
 		return false, err
 	}
 
-	return false, d.updateVMStatus(vm, newCfg)
+	err = d.updateVMStatus(vm, newCfg)
+	if err != nil {
+		return false, err
+	}
+
+	return false, nil
 }
 
 func (d *VMHandlerDispatch) isMigrationDestination(namespace string, vmName string) (bool, error) {
