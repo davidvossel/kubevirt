@@ -20,9 +20,13 @@
 package virthandler
 
 import (
+	"encoding/json"
 	goerror "errors"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -40,8 +44,10 @@ import (
 	cloudinit "kubevirt.io/kubevirt/pkg/cloud-init"
 	configdisk "kubevirt.io/kubevirt/pkg/config-disk"
 	"kubevirt.io/kubevirt/pkg/controller"
+	diskutils "kubevirt.io/kubevirt/pkg/ephemeral-disk-utils"
 	"kubevirt.io/kubevirt/pkg/kubecli"
 	"kubevirt.io/kubevirt/pkg/log"
+	"kubevirt.io/kubevirt/pkg/precond"
 	registrydisk "kubevirt.io/kubevirt/pkg/registry-disk"
 	"kubevirt.io/kubevirt/pkg/virt-handler/virtwrap"
 	"kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/api"
@@ -129,6 +135,131 @@ type VMHandlerDispatch struct {
 	configDisk             configdisk.ConfigDiskClient
 	virtShareDir           string
 	watchdogTimeoutSeconds int
+}
+
+type gracePeriodInfo struct {
+	GracePeriodSeconds       int64 `json:"GracePeriodSeconds"`
+	GracePeriodStartTimeUnix int64 `json:"GracePeriodStartTimeUnix"`
+}
+
+func (d *VMHandlerDispatch) gracePeriodInfoFilePath(vm *v1.VirtualMachine) string {
+	namespace := precond.MustNotBeEmpty(vm.GetObjectMeta().GetNamespace())
+	domain := precond.MustNotBeEmpty(vm.GetObjectMeta().GetName())
+
+	info := namespace + "_" + domain
+	return filepath.Join(d.virtShareDir, "grace-period-info", info)
+}
+
+func (d *VMHandlerDispatch) initializeGracePeriodInfo(vm *v1.VirtualMachine) error {
+	gracePeriodSeconds := int64(v1.DefaultGracePeriodSeconds)
+	if vm.Spec.TerminationGracePeriodSeconds != nil {
+		gracePeriodSeconds = *vm.Spec.TerminationGracePeriodSeconds
+	}
+
+	info := &gracePeriodInfo{
+		GracePeriodSeconds:       gracePeriodSeconds,
+		GracePeriodStartTimeUnix: 0,
+	}
+	return d.setGracePeriodInfo(vm, info)
+}
+
+func (d *VMHandlerDispatch) signalGracePeriodStarted(vm *v1.VirtualMachine, ignoreNonExistant bool) error {
+	now := time.Now().UTC().Unix()
+
+	info, err := d.getGracePeriodInfo(vm)
+	if err != nil {
+		return err
+	} else if info == nil {
+		if ignoreNonExistant == false {
+			gracePeriodSeconds := int64(v1.DefaultGracePeriodSeconds)
+			if vm.Spec.TerminationGracePeriodSeconds != nil {
+				gracePeriodSeconds = *vm.Spec.TerminationGracePeriodSeconds
+			}
+			info := &gracePeriodInfo{
+				GracePeriodSeconds:       gracePeriodSeconds,
+				GracePeriodStartTimeUnix: now,
+			}
+			return d.setGracePeriodInfo(vm, info)
+		} else {
+			return nil
+		}
+	}
+
+	// only update start time if it was not previously set
+	if info.GracePeriodStartTimeUnix == 0 {
+		info.GracePeriodStartTimeUnix = time.Now().UTC().Unix()
+		return d.setGracePeriodInfo(vm, info)
+	}
+
+	return nil
+}
+
+func (d *VMHandlerDispatch) hasGracePeriodExpired(vm *v1.VirtualMachine) (bool, error) {
+	info, err := d.getGracePeriodInfo(vm)
+
+	if err != nil {
+		return false, err
+	} else if info == nil {
+		return true, err
+	}
+
+	if info.GracePeriodStartTimeUnix == 0 {
+		return false, nil
+	}
+
+	now := time.Now().UTC().Unix()
+	diff := now - info.GracePeriodStartTimeUnix
+
+	if diff > info.GracePeriodSeconds {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (d *VMHandlerDispatch) setGracePeriodInfo(vm *v1.VirtualMachine, info *gracePeriodInfo) error {
+	path := d.gracePeriodInfoFilePath(vm)
+
+	err := os.MkdirAll(filepath.Dir(path), 0755)
+	if err != nil {
+		return err
+	}
+
+	buf, err := json.MarshalIndent(info, "", "  ")
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(path, buf, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *VMHandlerDispatch) getGracePeriodInfo(vm *v1.VirtualMachine) (*gracePeriodInfo, error) {
+	path := d.gracePeriodInfoFilePath(vm)
+	exists, err := diskutils.FileExists(path)
+	if err != nil {
+		return nil, err
+	} else if !exists {
+		return nil, nil
+	}
+
+	buf, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	info := gracePeriodInfo{}
+	err = json.Unmarshal(buf, &info)
+	if err != nil {
+		return nil, err
+	}
+	return &info, nil
+}
+
+func (d *VMHandlerDispatch) deleteGracePeriodInfo(vm *v1.VirtualMachine) error {
+	path := d.gracePeriodInfoFilePath(vm)
+	return diskutils.RemoveFile(path)
 }
 
 func (d *VMHandlerDispatch) getVMNodeAddress(vm *v1.VirtualMachine) (string, error) {
@@ -236,6 +367,7 @@ func (d *VMHandlerDispatch) Execute(store cache.Store, queue workqueue.RateLimit
 			queue.Forget(key)
 			return
 		}
+
 		// The VM is deleted on the cluster, continue with processing the deletion on the host.
 		processUpdateType = updateTypeDeletion
 	}
@@ -462,8 +594,30 @@ func (d *VMHandlerDispatch) injectDiskAuth(vm *v1.VirtualMachine) (*v1.VirtualMa
 }
 
 func (d *VMHandlerDispatch) handleDeletion(vm *v1.VirtualMachine) (bool, error) {
+
+	err := d.signalGracePeriodStarted(vm, true)
+	if err != nil {
+		return false, err
+	}
+
+	expired, err := d.hasGracePeriodExpired(vm)
+	if err != nil {
+		return false, err
+	}
+
+	if expired == false {
+		err = d.domainManager.SignalShutdownVM(vm)
+		if err != nil {
+			return false, err
+		}
+		// pending graceful shutdown.
+		return true, nil
+	}
+
+	log.Log.Object(vm).Info("grace period expired, killing deleted VM.")
+
 	// Since the VM was not in the cache, we delete it
-	err := d.domainManager.KillVM(vm)
+	err = d.domainManager.KillVM(vm)
 	if err != nil {
 		return false, err
 	}
@@ -489,22 +643,54 @@ func (d *VMHandlerDispatch) handleDeletion(vm *v1.VirtualMachine) (bool, error) 
 		return false, err
 	}
 
+	err = d.deleteGracePeriodInfo(vm)
+	if err != nil {
+		return false, err
+	}
+
 	return false, d.configDisk.Undefine(vm)
 
 }
 
 func (d *VMHandlerDispatch) handleWatchdogExpire(vm *v1.VirtualMachine) (bool, error) {
 	log.Log.Object(vm).Info("Processing expired watchdog")
-	return d.handleDeletion(vm)
+
+	err := d.domainManager.KillVM(vm)
+	if err != nil {
+		return false, err
+	}
+
+	return false, nil
 }
 
 func (d *VMHandlerDispatch) handleGracefulShutdown(vm *v1.VirtualMachine) (bool, error) {
 	log.Log.Object(vm).Info("Requesting shutdown due to graceful shutdown trigger")
-	err := d.domainManager.SignalShutdownVM(vm)
+
+	err := d.signalGracePeriodStarted(vm, false)
 	if err != nil {
 		return false, err
 	}
-	return false, nil
+
+	expired, err := d.hasGracePeriodExpired(vm)
+	if err != nil {
+		return false, err
+	}
+
+	if expired {
+		log.Log.Object(vm).Info("grace period expired, killing VM.")
+		err := d.domainManager.KillVM(vm)
+		if err != nil {
+			return false, err
+		}
+
+		return false, nil
+	}
+
+	err = d.domainManager.SignalShutdownVM(vm)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (d *VMHandlerDispatch) handleNormalUpdate(vm *v1.VirtualMachine) (bool, error) {
@@ -557,6 +743,12 @@ func (d *VMHandlerDispatch) handleNormalUpdate(vm *v1.VirtualMachine) (bool, err
 		// Everything except shutting down the VM is not
 		// permitted when it is migrating.
 		return false, nil
+	}
+
+	// store grace period info locally in case VM object is deleted before shutting down
+	err = d.initializeGracePeriodInfo(vm)
+	if err != nil {
+		return false, err
 	}
 
 	// TODO check if found VM has the same UID like the domain,
