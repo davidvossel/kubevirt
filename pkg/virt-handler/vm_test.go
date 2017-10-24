@@ -163,6 +163,44 @@ var _ = Describe("VM", func() {
 			dispatch.Execute(vmStore, vmQueue, "default/testvm")
 
 		}, 3)
+		It("should immediately kill domain with grace period of 0", func(done Done) {
+			vm := v1.NewMinimalVM("testvm")
+
+			server.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/apis/kubevirt.io/v1alpha1/namespaces/default/virtualmachines/testvm"),
+					ghttp.RespondWithJSONEncoded(http.StatusNotFound, struct{}{}),
+				),
+			)
+
+			domainManager.EXPECT().KillVM(vm).Do(func(vm *v1.VirtualMachine) {
+				close(done)
+			})
+
+			var gracePeriod int64
+
+			gracePeriod = 0
+			vm.Spec.TerminationGracePeriodSeconds = &gracePeriod
+			vm.Status.Phase = v1.Running
+
+			vmStore.Add(vm)
+
+			err := os.MkdirAll(virtlauncher.GracefulShutdownTriggerDir(shareDir), 0755)
+			Expect(err).NotTo(HaveOccurred())
+			err = os.MkdirAll(watchdog.WatchdogFileDirectory(shareDir), 0755)
+			Expect(err).NotTo(HaveOccurred())
+
+			triggerFile := virtlauncher.GracefulShutdownTriggerFromNamespaceName(shareDir, "default", "testvm")
+
+			err = virtlauncher.GracefulShutdownTriggerInitiate(triggerFile)
+			Expect(err).NotTo(HaveOccurred())
+
+			watchdogFile := watchdog.WatchdogFileFromNamespaceName(shareDir, "default", "testvm")
+			err = watchdog.WatchdogFileUpdate(watchdogFile)
+			Expect(err).NotTo(HaveOccurred())
+
+			dispatch.Execute(vmStore, vmQueue, "default/testvm")
+		}, 3)
 		It("should leave the Domain alone if the VM is migrating to its host", func() {
 			vm := v1.NewMinimalVM("testvm")
 			vm.Status.MigrationNodeName = "master"

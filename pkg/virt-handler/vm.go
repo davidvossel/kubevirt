@@ -210,7 +210,7 @@ func (d *VMHandlerDispatch) hasGracePeriodExpired(vm *v1.VirtualMachine) (bool, 
 	now := time.Now().UTC().Unix()
 	diff := now - info.GracePeriodStartTimeUnix
 
-	if diff > info.GracePeriodSeconds {
+	if diff >= info.GracePeriodSeconds {
 		return true, nil
 	}
 	return false, nil
