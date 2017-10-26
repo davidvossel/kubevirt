@@ -164,6 +164,8 @@ func (app *virtHandlerApp) Run() {
 		panic(err)
 	}
 
+	virtlauncher.InitializeSharedDirectories(app.VirtShareDir)
+
 	watchdogInformer := cache.NewSharedIndexInformer(
 		watchdog.NewWatchdogListWatchFromClient(
 			app.VirtShareDir,
