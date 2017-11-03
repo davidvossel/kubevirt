@@ -783,6 +783,80 @@ func NewRandomReplicaSetFromVM(vm *v1.VirtualMachine, replicas int32) *v1.Virtua
 	return rs
 }
 
+func ContainerHasLogString(virtCli kubecli.KubevirtClient,
+	containerName string,
+	namespace string,
+	podLabelSelector string,
+	sinceSeconds int64,
+	tailLines int64,
+	matchString string) {
+
+	Eventually(GetLogsUsingLabelSelector(virtCli, containerName, namespace, podLabelSelector, sinceSeconds, tailLines),
+		30*time.Second,
+		500*time.Millisecond).
+		Should(ContainSubstring(matchString))
+}
+
+func PodHasLogRegex(virtCli kubecli.KubevirtClient,
+	pod *k8sv1.Pod,
+	containerName string,
+	sinceSeconds int64,
+	matchRegex string) {
+
+	Eventually(GetLogsUsingPod(virtCli, pod, containerName, sinceSeconds, int64(0)),
+		30*time.Second,
+		500*time.Millisecond).
+		Should(MatchRegexp(matchRegex))
+}
+
+func GetLogsUsingLabelSelector(virtCli kubecli.KubevirtClient,
+	containerName string,
+	namespace string,
+	podLabelSelector string,
+	sinceSeconds int64,
+	tailLines int64) string {
+
+	pods, err := virtCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: podLabelSelector})
+	Expect(err).ToNot(HaveOccurred())
+
+	var foundPod k8sv1.Pod
+	podName := ""
+	for _, pod := range pods.Items {
+		if pod.ObjectMeta.DeletionTimestamp == nil && pod.Status.Phase == k8sv1.PodRunning {
+			podName = pod.ObjectMeta.Name
+			foundPod = pod
+			break
+		}
+	}
+	Expect(podName).ToNot(BeEmpty())
+
+	return GetLogsUsingPod(virtCli, &foundPod, containerName, sinceSeconds, tailLines)
+}
+
+func GetLogsUsingPod(virtCli kubecli.KubevirtClient,
+	pod *k8sv1.Pod,
+	containerName string,
+	sinceSeconds int64,
+	tailLines int64) string {
+
+	podName := pod.GetObjectMeta().GetName()
+	podNamespace := pod.GetObjectMeta().GetNamespace()
+
+	options := &k8sv1.PodLogOptions{Container: containerName}
+	if sinceSeconds != 0 {
+		options.SinceSeconds = &sinceSeconds
+	}
+	if tailLines != 0 {
+		options.TailLines = &tailLines
+	}
+
+	logsRaw, err := virtCli.CoreV1().Pods(podNamespace).GetLogs(podName, options).DoRaw()
+
+	Expect(err).To(BeNil())
+
+	return string(logsRaw)
+}
+
 func NewConsoleExpecter(config *rest.Config, vm *v1.VirtualMachine, consoleName string, timeout time.Duration, opts ...expect.Option) (expect.Expecter, <-chan error, error) {
 	vmReader, vmWriter := io.Pipe()
 	expecterReader, expecterWriter := io.Pipe()

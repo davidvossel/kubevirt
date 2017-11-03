@@ -101,11 +101,12 @@ var _ = Describe("Vmlifecycle", func() {
 			Expect(err).To(BeNil())
 			tests.WaitForSuccessfulVMStart(obj)
 
-			logs := func() string { return getVirtLauncherLogs(virtClient, vm) }
-			Eventually(logs,
-				11*time.Second,
-				500*time.Millisecond).
-				Should(ContainSubstring("Found PID for qemu"))
+			namespace := vm.GetObjectMeta().GetNamespace()
+			domain := vm.GetObjectMeta().GetName()
+			label := fmt.Sprintf("kubevirt.io/domain in (%s)", domain)
+
+			tests.ContainerHasLogString(virtClient, "compute", namespace, label, int64(0), int64(100), "Found PID for qemu")
+
 			close(done)
 		}, 30)
 
@@ -237,11 +238,6 @@ var _ = Describe("Vmlifecycle", func() {
 				virtHandlerPod, err := kubecli.NewVirtHandlerClient(virtClient).ForNode(primaryNodeName).Pod()
 				Expect(err).ToNot(HaveOccurred())
 
-				handlerName := virtHandlerPod.GetObjectMeta().GetName()
-				handlerNamespace := virtHandlerPod.GetObjectMeta().GetNamespace()
-				seconds := int64(120)
-				logsQuery := virtClient.CoreV1().Pods(handlerNamespace).GetLogs(handlerName, &k8sv1.PodLogOptions{SinceSeconds: &seconds, Container: "virt-handler"})
-
 				// Make sure we schedule the VM to master
 				vm.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": primaryNodeName}
 
@@ -250,12 +246,9 @@ var _ = Describe("Vmlifecycle", func() {
 				Expect(err).ToNot(HaveOccurred())
 				tests.WaitForSuccessfulVMStart(obj)
 
-				// Check if the start event was logged
-				Eventually(func() string {
-					data, err := logsQuery.DoRaw()
-					Expect(err).ToNot(HaveOccurred())
-					return string(data)
-				}, 30, 0.5).Should(MatchRegexp("(name=%s)[^\n]+(kind=Domain)[^\n]+(Domain is in state Running)", vm.GetObjectMeta().GetName()))
+				// verify virt-handler log has "Domain is in state Running" log message
+				tests.PodHasLogRegex(virtClient, virtHandlerPod, "virt-handler", int64(120), fmt.Sprintf("(name=%s)[^\n]+(kind=Domain)[^\n]+(Domain is in state Running)", vm.GetObjectMeta().GetName()))
+
 				// Check the VM Namespace
 				Expect(vm.GetObjectMeta().GetNamespace()).To(Equal(namespace))
 
@@ -264,12 +257,8 @@ var _ = Describe("Vmlifecycle", func() {
 				Expect(err).To(BeNil())
 				tests.NewObjectEventWatcher(obj).SinceWatchedObjectResourceVersion().WaitFor(tests.NormalEvent, v1.Deleted)
 
-				// Check if the stop event was logged
-				Eventually(func() string {
-					data, err := logsQuery.DoRaw()
-					Expect(err).ToNot(HaveOccurred())
-					return string(data)
-				}, 30, 0.5).Should(MatchRegexp("(name=%s)[^\n]+(kind=Domain)[^\n]+(Domain deleted)", vm.GetObjectMeta().GetName()))
+				// verify virt-handler log has "Domain deleted" log message
+				tests.PodHasLogRegex(virtClient, virtHandlerPod, "virt-handler", int64(120), fmt.Sprintf("(name=%s)[^\n]+(kind=Domain)[^\n]+(Domain deleted)", vm.GetObjectMeta().GetName()))
 
 			},
 				table.Entry(tests.NamespaceTestDefault, tests.NamespaceTestDefault),
@@ -312,35 +301,6 @@ func renderPkillAllJob(dockerTag string, processName string) *k8sv1.Pod {
 	}
 
 	return &job
-}
-
-func getVirtLauncherLogs(virtCli kubecli.KubevirtClient, vm *v1.VirtualMachine) string {
-	namespace := vm.GetObjectMeta().GetNamespace()
-	domain := vm.GetObjectMeta().GetName()
-
-	labelSelector := fmt.Sprintf("kubevirt.io/domain in (%s)", domain)
-
-	pods, err := virtCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: labelSelector})
-	Expect(err).ToNot(HaveOccurred())
-
-	podName := ""
-	for _, pod := range pods.Items {
-		if pod.ObjectMeta.DeletionTimestamp == nil {
-			podName = pod.ObjectMeta.Name
-			break
-		}
-	}
-	Expect(podName).ToNot(BeEmpty())
-
-	var tailLines int64 = 100
-	logsRaw, err := virtCli.CoreV1().
-		Pods(namespace).
-		GetLogs(podName,
-			&k8sv1.PodLogOptions{TailLines: &tailLines}).
-		DoRaw()
-	Expect(err).To(BeNil())
-
-	return string(logsRaw)
 }
 
 func pkillAllLaunchers(virtCli kubecli.KubevirtClient, node, dockerTag string) error {
