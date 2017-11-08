@@ -11,10 +11,12 @@ ignore:
 - k8s.io/client-go/listers/autoscaling/v2alpha1
 - k8s.io/api/autoscaling/v2alpha1
 - k8s.io/kube-openapi/pkg/util/proto
-- github.com/coreos/etcd
 - github.com/gogo/protobuf/test/typedeclimport/subpkg
 - github.com/gogo/protobuf/test/issue312
 - github.com/spf13/cobra/doc
+- github.com/coreos/go-oidc/jose
+- github.com/coreos/go-oidc/oidc
+- github.com/coreos/go-oidc/key
 import:
 - package: github.com/go-kit/kit
   version: fe6fe28ba0d54b39f27e79cddba4911b7e4fffc7
@@ -27,7 +29,15 @@ import:
 - package: github.com/evanphx/json-patch
   version: ba18e35c5c1b36ef6334cad706eb681153d2d379
 - package: k8s.io/client-go
-  version: v5.0.1
+  version: dbe8fe09ed1682bc26b4e55cac5ef65dcd7664e9
+- package: k8s.io/apiserver
+  version: 7001bc4df8883d4a0ec84cd4b2117655a0009b6c
+- package: k8s.io/apimachinery
+  version: 019ae5ada31de202164b118aee88ee2d14075c31
+- package: k8s.io/api
+  version: 218912509d74a117d05a718bb926d0948e531c20
+- package: k8s.io/kube-openapi
+  version: 61b46af70dfed79c6d24530cd23b41440a7f22a5
 - package: github.com/fsnotify/fsnotify
   version: ^1.4.2
 - package: github.com/mailru/easyjson
@@ -35,6 +45,19 @@ import:
 - package: github.com/emicklei/go-restful-openapi
 - package: github.com/go-openapi/spec
 - package: github.com/emicklei/go-restful-swagger12
+- package: google.golang.org/grpc                                                     
+  version: v1.7.3
+  subpackages:                                                                        
+  - codes
+  - credentials
+  - grpclog
+  - internal
+  - metadata                                                                          
+  - naming                                                                            
+  - peer                                                                              
+  - transport                                                                         
+  - health                                                                            
+  - health/grpc_health_v1 
 testImport:
 - package: github.com/elazarl/goproxy
   version: 07b16b6e30fcac0ad8c0435548e743bcf2ca7e92
@@ -53,4 +76,3 @@ testImport:
   version: 64131543e7896d5bcc6bd5a76287eb75ea96c673
 - package: github.com/google/goexpect
 - package: github.com/google/goterm
-- package: google.golang.org/grpc

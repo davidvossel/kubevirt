@@ -22,9 +22,10 @@ package v1
 import (
 	"encoding/json"
 
+	uuid "kubevirt.io/kubevirt/vendor.orig/github.com/satori/go.uuid"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/satori/go.uuid"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )

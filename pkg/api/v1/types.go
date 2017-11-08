@@ -31,7 +31,6 @@ import (
 	"reflect"
 
 	"github.com/jeevatkm/go-model"
-	"github.com/satori/go.uuid"
 
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -44,7 +43,17 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"kubevirt.io/kubevirt/pkg/precond"
+	uuid "kubevirt.io/kubevirt/vendor.orig/github.com/satori/go.uuid"
 )
+
+// GroupName is the group name use in this package
+const TestGroupName = "test.kubevirt.io"
+
+// GroupVersion is group version used to register these objects
+var TestGroupVersion = schema.GroupVersion{Group: TestGroupName, Version: "v1alpha1"}
+
+// GroupVersionKind
+var TestGroupVersionKind = schema.GroupVersionKind{Group: TestGroupName, Version: TestGroupVersion.Version, Kind: "Test"}
 
 // GroupName is the group name use in this package
 const GroupName = "kubevirt.io"
@@ -77,6 +86,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&VirtualMachineReplicaSet{},
 		&VirtualMachineReplicaSetList{},
 		&metav1.GetOptions{},
+		&Test{},
 	)
 	return nil
 }
@@ -102,6 +112,36 @@ func init() {
 	model.AddConversion((*string)(nil), (*uuid.UUID)(nil), func(in reflect.Value) (reflect.Value, error) {
 		return reflect.ValueOf(uuid.FromStringOrNil(in.String())), nil
 	})
+}
+
+type Test struct {
+	metav1.TypeMeta `json:",inline"`
+	ListMeta        metav1.ListMeta `json:"metadata,omitempty"`
+}
+
+func (in *Test) DeepCopyInto(out *Test) {
+	err := model.Copy(out, in)
+	if err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (in *Test) DeepCopy() *Test {
+	if in == nil {
+		return nil
+	}
+	out := new(Test)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *Test) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
 }
 
 // VirtualMachine is *the* VM Definition. It represents a virtual machine in the runtime environment of kubernetes.
