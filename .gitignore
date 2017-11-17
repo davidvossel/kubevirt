@@ -22,5 +22,5 @@ cluster/.console.vv
 build-tools/desc/desc
 hack/config-local.sh
 tags
-.Gopkg.*
+.glide.*
 .GeneratedDockerfile
