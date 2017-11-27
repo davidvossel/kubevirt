@@ -31,7 +31,6 @@ import (
 	"reflect"
 
 	"github.com/jeevatkm/go-model"
-	"github.com/satori/go.uuid"
 
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -44,6 +43,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"kubevirt.io/kubevirt/pkg/precond"
+	uuid "kubevirt.io/kubevirt/vendor.orig/github.com/satori/go.uuid"
 )
 
 // GroupName is the group name use in this package

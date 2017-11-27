@@ -19,7 +19,7 @@ apidocs: generate
 		gradle \
 		bash hack/gen-swagger-doc/gen-swagger-docs.sh v1 html
 
-build: checksync fmt vet compile
+build: checksync fmt compile
 
 compile:
 	./hack/build-go.sh install ${WHAT}
