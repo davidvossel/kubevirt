@@ -108,6 +108,4 @@ spec:
       - name: wardle-server
         image: kubevirt/test-api:devel
         imagePullPolicy: Never
-        command: [ "/test-api", "--etcd-servers=http://localhost:2379" ]
-      - name: etcd
-        image: quay.io/coreos/etcd:v3.1.10
+        command: [ "/test-api", "-v=10", "--etcd-servers=http://localhost:2379" ]

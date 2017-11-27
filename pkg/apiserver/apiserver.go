@@ -17,6 +17,9 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
+	"net/http"
+
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 
 	"kubevirt.io/kubevirt/pkg/apis/wardle"
 	"kubevirt.io/kubevirt/pkg/apis/wardle/install"
@@ -99,6 +105,35 @@ func (cfg *Config) Complete() CompletedConfig {
 	return CompletedConfig{&c}
 }
 
+// FakeSubresourceREST implements the exec subresource for a Pod
+type FakeSubresourceREST struct {
+	Store *genericregistry.Store
+}
+
+// Implement Connecter
+var _ = rest.Connecter(&FakeSubresourceREST{})
+
+// New creates a new Pod object
+func (r *FakeSubresourceREST) New() runtime.Object {
+	return &wardle.Flunder{}
+}
+
+// Connect returns a handler for the pod exec proxy
+func (r *FakeSubresourceREST) Connect(ctx genericapirequest.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+	return nil, fmt.Errorf("kubevirt not implemented yet")
+}
+
+// NewConnectOptions returns the versioned object that represents exec parameters
+func (r *FakeSubresourceREST) NewConnectOptions() (runtime.Object, bool, string) {
+	return nil, false, ""
+}
+
+// ConnectMethods returns the methods supported by exec
+func (r *FakeSubresourceREST) ConnectMethods() []string {
+	res := []string{"GET", "POST"}
+	return res
+}
+
 // New returns a new instance of WardleServer from the given config.
 func (c completedConfig) New() (*WardleServer, error) {
 	genericServer, err := c.GenericConfig.New("sample-apiserver", genericapiserver.EmptyDelegate)
@@ -110,11 +145,16 @@ func (c completedConfig) New() (*WardleServer, error) {
 		GenericAPIServer: genericServer,
 	}
 
+	fakeStore, err := flunderstorage.NewSTORE(Scheme, c.GenericConfig.RESTOptionsGetter)
+	fakeSubresource := &FakeSubresourceREST{
+		Store: fakeStore,
+	}
+
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(wardle.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
 	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
 	v1alpha1storage := map[string]rest.Storage{}
-	v1alpha1storage["flunders"] = wardleregistry.RESTInPeace(flunderstorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter))
-	v1alpha1storage["fischers"] = wardleregistry.RESTInPeace(fischerstorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter))
+	v1alpha1storage["flunders"] = fakeSubresource
+	v1alpha1storage["flunders/fakesubresource"] = fakeSubresource
 	apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1alpha1storage
 
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {

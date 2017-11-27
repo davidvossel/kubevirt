@@ -25,8 +25,8 @@ import (
 	"kubevirt.io/kubevirt/pkg/registry"
 )
 
-// NewREST returns a RESTStorage object that will work against API services.
-func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (*registry.REST, error) {
+func NewSTORE(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (*genericregistry.Store, error) {
+
 	strategy := NewStrategy(scheme)
 
 	store := &genericregistry.Store{
@@ -41,6 +41,16 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (*reg
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
+		return nil, err
+	}
+
+	return store, nil
+}
+
+// NewREST returns a RESTStorage object that will work against API services.
+func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (*registry.REST, error) {
+	store, err := NewSTORE(scheme, optsGetter)
+	if err != nil {
 		return nil, err
 	}
 	return &registry.REST{store}, nil

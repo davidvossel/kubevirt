@@ -48,6 +48,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&FlunderList{},
 		&Fischer{},
 		&FischerList{},
+		&FakeResourceOptions{},
 	)
 	return nil
 }

@@ -16,7 +16,11 @@ limitations under the License.
 
 package v1alpha1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	model "github.com/jeevatkm/go-model"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -43,6 +47,36 @@ type Flunder struct {
 
 	Spec   FlunderSpec   `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 	Status FlunderStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// FakeResourceOptions is the query options to a Pod's remote exec call
+type FakeResourceOptions struct {
+	metav1.TypeMeta
+}
+
+func (in *FakeResourceOptions) DeepCopyInto(out *FakeResourceOptions) {
+	err := model.Copy(out, in)
+	if err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (in *FakeResourceOptions) DeepCopy() *FakeResourceOptions {
+	if in == nil {
+		return nil
+	}
+	out := new(FakeResourceOptions)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *FakeResourceOptions) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
 }
 
 // +genclient
