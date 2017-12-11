@@ -2905,10 +2905,23 @@
      "type"
     ],
     "properties": {
+     "source": {
+      "$ref": "#/definitions/v1.SerialSource"
+     },
      "target": {
       "$ref": "#/definitions/v1.SerialTarget"
      },
      "type": {
+      "type": "string"
+     }
+    }
+   },
+   "v1.SerialSource": {
+    "properties": {
+     "mode": {
+      "type": "string"
+     },
+     "path": {
       "type": "string"
      }
     }
