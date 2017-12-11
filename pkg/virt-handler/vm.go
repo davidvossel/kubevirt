@@ -593,6 +593,58 @@ func mapPVToDisk(disk *v1.Disk, pv *k8sv1.PersistentVolume) (*v1.Disk, error) {
 	}
 }
 
+func (d *VirtualMachineController) getUnusedSerialPort(vm *v1.VirtualMachine) (uint, error) {
+	// look for an unclaimed serial port.
+	for i := 0; i < 100; i++ {
+		claimed := false
+		for _, serial := range vm.Spec.Domain.Devices.Serials {
+			if serial.Target == nil || serial.Target.Port == nil {
+				continue
+			}
+
+			if *serial.Target.Port == uint(i) {
+				claimed = true
+				break
+			}
+		}
+
+		if claimed == false {
+			return uint(i), nil
+		}
+	}
+
+	return 0, goerror.New("No serial port found for console")
+}
+
+func (d *VirtualMachineController) MapConsoleAccess(vm *v1.VirtualMachine) *v1.VirtualMachine {
+	for _, console := range vm.Spec.Domain.Devices.Consoles {
+		if console.Type == "pty" && console.Target == nil {
+			serialPort, err := d.getUnusedSerialPort(vm)
+			if err != nil {
+				// this is best effort. Don't block starting the
+				// vm because the user is doing something advanced
+				// with serial ports that prevents us from mapping
+				// the console target.
+				return vm
+			}
+
+			unixPath := fmt.Sprintf("/tmp/virt-serial%d", serialPort)
+			vm.Spec.Domain.Devices.Serials = append(vm.Spec.Domain.Devices.Serials, v1.Serial{
+				Type: "unix",
+				Target: &v1.SerialTarget{
+					Port: &serialPort,
+				},
+
+				Source: &v1.SerialSource{
+					Mode: "bind",
+					Path: unixPath,
+				},
+			})
+		}
+	}
+	return vm
+}
+
 func (d *VirtualMachineController) injectDiskAuth(vm *v1.VirtualMachine) (*v1.VirtualMachine, error) {
 	for idx, disk := range vm.Spec.Domain.Devices.Disks {
 		if disk.Auth == nil || disk.Auth.Secret == nil || disk.Auth.Secret.Usage == "" {
@@ -733,6 +785,12 @@ func (d *VirtualMachineController) processVmUpdate(vm *v1.VirtualMachine) error 
 
 	// Map whatever devices are being used for config-init
 	vm, err = cloudinit.MapCloudInitDisks(vm)
+	if err != nil {
+		return err
+	}
+
+	// Map serial console access details
+	vm = d.MapConsoleAccess(vm)
 	if err != nil {
 		return err
 	}
