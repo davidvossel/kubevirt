@@ -1,0 +1,3 @@
+#!/bin/bash
+SOCKET=$1
+socat unix-connect:/$SOCKET stdio
