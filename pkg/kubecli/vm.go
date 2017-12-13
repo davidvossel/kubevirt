@@ -61,27 +61,27 @@ type vms struct {
 	kubeconfig string
 }
 
-func findPod(clientSet *kubernetes.Clientset, namespace string, name string) (string, string, error) {
+func findPod(clientSet *kubernetes.Clientset, namespace string, name string) (string, error) {
 	fieldSelector := fields.ParseSelectorOrDie("status.phase==" + string(k8sv1.PodRunning))
 	labelSelector, err := labels.Parse(fmt.Sprintf(v1.AppLabel+"=virt-launcher,"+v1.DomainLabel+" in (%s)", name))
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	selector := k8smetav1.ListOptions{FieldSelector: fieldSelector.String(), LabelSelector: labelSelector.String()}
 
 	podList, err := clientSet.CoreV1().Pods(namespace).List(selector)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 
 	if len(podList.Items) == 0 {
-		return "", "", goerror.New("console connection failed. No VM pod is running")
+		return "", goerror.New("console connection failed. No VM pod is running")
 	}
-	return podList.Items[0].ObjectMeta.Name, podList.Items[0].Spec.Containers[0].Name, nil
+	return podList.Items[0].ObjectMeta.Name, nil
 }
 
 func (v *vms) SerialConsole(name string, device string, in io.Reader, out io.Writer) error {
-	podName, containerName, err := findPod(v.clientSet, v.namespace, name)
+	podName, err := findPod(v.clientSet, v.namespace, name)
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (v *vms) SerialConsole(name string, device string, in io.Reader, out io.Wri
 		return err
 	}
 	cmd := []string{"/sock-connector", fmt.Sprintf("/var/run/kubevirt-private/%s/%s/virt-%s", v.namespace, name, device)}
-
+	containerName := "compute"
 	req := restClient.Post().
 		Resource("pods").
 		Name(podName).
