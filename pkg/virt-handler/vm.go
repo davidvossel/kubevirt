@@ -670,6 +670,29 @@ func (d *VirtualMachineController) MapConsoleAccess(vm *v1.VirtualMachine) *v1.V
 	return vm
 }
 
+func (d *VirtualMachineController) MapVncAccess(vm *v1.VirtualMachine) *v1.VirtualMachine {
+	for idx, graphic := range vm.Spec.Domain.Devices.Graphics {
+		if graphic.Type == "vnc" {
+			namespace := vm.ObjectMeta.Namespace
+			name := vm.ObjectMeta.Name
+			unixPath := fmt.Sprintf("%s-private/%s/%s/virt-vnc", d.virtShareDir, namespace, name)
+			err := diskutils.SetFileOwnership("qemu", filepath.Dir(unixPath))
+			if err != nil {
+				// TODO
+				return vm
+			}
+
+			graphic.Listen.Type = "socket"
+			graphic.Listen.Socket = unixPath
+
+			vm.Spec.Domain.Devices.Graphics[idx] = graphic
+			return vm
+		}
+	}
+
+	return vm
+}
+
 func (d *VirtualMachineController) injectDiskAuth(vm *v1.VirtualMachine) (*v1.VirtualMachine, error) {
 	for idx, disk := range vm.Spec.Domain.Devices.Disks {
 		if disk.Auth == nil || disk.Auth.Secret == nil || disk.Auth.Secret.Usage == "" {
@@ -821,6 +844,12 @@ func (d *VirtualMachineController) processVmUpdate(vm *v1.VirtualMachine) error 
 
 	// Map serial console access details
 	vm = d.MapConsoleAccess(vm)
+	if err != nil {
+		return err
+	}
+
+	// Map serial console access details
+	vm = d.MapVncAccess(vm)
 	if err != nil {
 		return err
 	}

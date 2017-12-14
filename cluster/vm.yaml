@@ -7,7 +7,7 @@ spec:
   domain:
     devices:
       graphics:
-      - type: spice
+      - type: vnc
       interfaces:
       - type: network
         source:

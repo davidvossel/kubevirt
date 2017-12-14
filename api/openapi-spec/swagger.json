@@ -2489,6 +2489,9 @@
      "network": {
       "type": "string"
      },
+     "socket": {
+      "type": "string"
+     },
      "type": {
       "type": "string"
      }

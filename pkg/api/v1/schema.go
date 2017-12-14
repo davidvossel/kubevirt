@@ -330,6 +330,7 @@ type Listen struct {
 	Type    string `json:"type"`
 	Address string `json:"address,omitempty"`
 	Network string `json:"network,omitempty"`
+	Socket  string `json:"socket,omitempty"`
 }
 
 type Address struct {
