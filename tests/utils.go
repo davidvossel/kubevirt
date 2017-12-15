@@ -662,6 +662,15 @@ func NewRandomVMWithSerialConsole() *v1.VirtualMachine {
 	return vm
 }
 
+func NewRandomVMWithVnc() *v1.VirtualMachine {
+	vm := NewRandomVM()
+	vm.Spec.Domain.Devices.Graphics = []v1.Graphics{
+		{
+			Type: "vnc",
+		},
+	}
+	return vm
+}
 func NewRandomVMWithSpice() *v1.VirtualMachine {
 	vm := NewRandomVM()
 	vm.Spec.Domain.Devices.Video = []v1.Video{
