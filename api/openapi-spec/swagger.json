@@ -2862,7 +2862,7 @@
     }
    },
    "v1.VirtualMachine": {
-    "description": "VirtualMachine is *the* VM Definition. It represents a virtual machine in the runtime environment of kubernetes.\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object",
+    "description": "VirtualMachine is *the* VM Definition. It represents a virtual machine in the runtime environment of kubernetes.\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object\n+k8s:openapi-gen=true",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -2986,7 +2986,7 @@
     }
    },
    "v1.VirtualMachineSpec": {
-    "description": "VirtualMachineSpec is a description of a VirtualMachine.",
+    "description": "VirtualMachineSpec is a description of a VirtualMachine.\n+k8s:openapi-gen=true",
     "required": [
      "domain"
     ],
@@ -3018,7 +3018,7 @@
     }
    },
    "v1.VirtualMachineStatus": {
-    "description": "VirtualMachineStatus represents information about the status of a VM. Status may trail the actual\nstate of a system.",
+    "description": "VirtualMachineStatus represents information about the status of a VM. Status may trail the actual\nstate of a system.\n+k8s:openapi-gen=true",
     "properties": {
      "conditions": {
       "description": "Conditions are specific points in VM's pod runtime.",

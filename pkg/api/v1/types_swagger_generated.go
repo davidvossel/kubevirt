@@ -4,7 +4,7 @@ package v1
 
 func (VirtualMachine) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"":       "VirtualMachine is *the* VM Definition. It represents a virtual machine in the runtime environment of kubernetes.\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object",
+		"":       "VirtualMachine is *the* VM Definition. It represents a virtual machine in the runtime environment of kubernetes.\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object\n+k8s:openapi-gen=true",
 		"spec":   "VM Spec contains the VM specification.",
 		"status": "Status is the high level overview of how the VM is doing. It contains information available to controllers and users.",
 	}
@@ -18,7 +18,7 @@ func (VirtualMachineList) SwaggerDoc() map[string]string {
 
 func (VirtualMachineSpec) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"":                              "VirtualMachineSpec is a description of a VirtualMachine.",
+		"":                              "VirtualMachineSpec is a description of a VirtualMachine.\n+k8s:openapi-gen=true",
 		"domain":                        "Specification of the desired behavior of the VirtualMachine on the host.",
 		"nodeSelector":                  "NodeSelector is a selector which must be true for the vm to fit on a node.\nSelector which must match a node's labels for the vm to be scheduled on that node.\nMore info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/\n+optional",
 		"affinity":                      "If affinity is specifies, obey all the affinity rules",
@@ -36,7 +36,7 @@ func (Affinity) SwaggerDoc() map[string]string {
 
 func (VirtualMachineStatus) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"":                  "VirtualMachineStatus represents information about the status of a VM. Status may trail the actual\nstate of a system.",
+		"":                  "VirtualMachineStatus represents information about the status of a VM. Status may trail the actual\nstate of a system.\n+k8s:openapi-gen=true",
 		"nodeName":          "NodeName is the name where the VM is currently running.",
 		"migrationNodeName": "MigrationNodeName is the node where the VM is live migrating to.",
 		"conditions":        "Conditions are specific points in VM's pod runtime.",
