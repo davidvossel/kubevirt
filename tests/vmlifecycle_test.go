@@ -270,7 +270,7 @@ var _ = Describe("Vmlifecycle", func() {
 				}()).To(Equal(v1.Failed))
 
 				close(done)
-			}, 50)
+			}, 90)
 		})
 
 		Context("in a non-default namespace", func() {

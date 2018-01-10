@@ -57,6 +57,7 @@ func (t *templateService) RenderLaunchManifest(vm *v1.VirtualMachine) (*kubev1.P
 	successThreshold := 1
 	failureThreshold := 5
 
+	var volumes []kubev1.Volume
 	var userId int64 = 0
 	var privileged bool = true
 
@@ -81,7 +82,13 @@ func (t *templateService) RenderLaunchManifest(vm *v1.VirtualMachine) (*kubev1.P
 		Name:            "compute",
 		Image:           t.launcherImage,
 		ImagePullPolicy: kubev1.PullIfNotPresent,
-		Command: []string{"/virt-launcher",
+		// Privileged mode is required for /dev/kvm and the
+		// ability to create macvtap devices
+		SecurityContext: &kubev1.SecurityContext{
+			RunAsUser:  &userId,
+			Privileged: &privileged,
+		},
+		Command: []string{"/entrypoint.sh",
 			"--qemu-timeout", "5m",
 			"--name", domain,
 			"--namespace", namespace,
@@ -99,8 +106,17 @@ func (t *templateService) RenderLaunchManifest(vm *v1.VirtualMachine) (*kubev1.P
 				MountPath: privateDir,
 			},
 			{
+				// shared with registry disks on Pod shared volume
 				Name:      "libvirt-runtime",
 				MountPath: "/var/run/libvirt",
+			},
+			{
+				Name:      "host-dev",
+				MountPath: "/host-dev",
+			},
+			{
+				Name:      "host-sys",
+				MountPath: "/host-sys",
 			},
 		},
 		ReadinessProbe: &kubev1.Probe{
@@ -120,59 +136,32 @@ func (t *templateService) RenderLaunchManifest(vm *v1.VirtualMachine) (*kubev1.P
 		},
 	}
 
-	libvirtdContainer := kubev1.Container{
-		Name:            "libvirtd",
-		Image:           t.launcherImage,
-		ImagePullPolicy: kubev1.PullIfNotPresent,
-		SecurityContext: &kubev1.SecurityContext{
-			RunAsUser:  &userId,
-			Privileged: &privileged,
-		},
-		Command: []string{"/libvirtd.sh"},
-		VolumeMounts: []kubev1.VolumeMount{
-			{
-				Name:      "host-dev",
-				MountPath: "/host-dev",
-			},
-			{
-				Name:      "host-sys",
-				MountPath: "/host-sys",
-			},
-			{
-				MountPath: t.virtShareDir,
-				Name:      "virt-share-dir",
-			},
-			{
-				Name:      "virt-private-dir",
-				MountPath: privateDir,
-			},
-			{
-				Name:      "libvirt-runtime",
-				MountPath: "/var/run/libvirt",
-			},
-			{
-				Name:      "libvirt-data",
-				MountPath: "/var/lib/libvirt",
-			},
-		},
-	}
-	virtlogdContainer := kubev1.Container{
-		Name:            "virtlogd",
-		Image:           t.launcherImage,
-		ImagePullPolicy: kubev1.PullIfNotPresent,
-		Command:         []string{"/usr/sbin/virtlogd", "-f", "/etc/libvirt/virtlogd.conf"},
-		VolumeMounts: []kubev1.VolumeMount{
-			{
-				Name:      "libvirt-runtime",
-				MountPath: "/var/run/libvirt",
-			},
-		},
-	}
-
-	containers, volumes, err := registrydisk.GenerateContainers(vm)
+	containers, err := registrydisk.GenerateContainers(vm, "libvirt-runtime", "/var/run/libvirt")
 	if err != nil {
 		return nil, err
 	}
+
+	volumes = append(volumes, kubev1.Volume{
+		Name: "virt-share-dir",
+		VolumeSource: kubev1.VolumeSource{
+			HostPath: &kubev1.HostPathVolumeSource{
+				Path: t.virtShareDir,
+			},
+		},
+	})
+	volumes = append(volumes, kubev1.Volume{
+		Name: "virt-private-dir",
+		VolumeSource: kubev1.VolumeSource{
+			EmptyDir: &kubev1.EmptyDirVolumeSource{},
+		},
+	})
+
+	volumes = append(volumes, kubev1.Volume{
+		Name: "libvirt-runtime",
+		VolumeSource: kubev1.VolumeSource{
+			EmptyDir: &kubev1.EmptyDirVolumeSource{},
+		},
+	})
 
 	volumes = append(volumes, kubev1.Volume{
 		Name: "host-dev",
@@ -190,33 +179,7 @@ func (t *templateService) RenderLaunchManifest(vm *v1.VirtualMachine) (*kubev1.P
 			},
 		},
 	})
-	volumes = append(volumes, kubev1.Volume{
-		Name: "virt-share-dir",
-		VolumeSource: kubev1.VolumeSource{
-			EmptyDir: &kubev1.EmptyDirVolumeSource{},
-		},
-	})
-	volumes = append(volumes, kubev1.Volume{
-		Name: "virt-private-dir",
-		VolumeSource: kubev1.VolumeSource{
-			EmptyDir: &kubev1.EmptyDirVolumeSource{},
-		},
-	})
-	volumes = append(volumes, kubev1.Volume{
-		Name: "libvirt-data",
-		VolumeSource: kubev1.VolumeSource{
-			EmptyDir: &kubev1.EmptyDirVolumeSource{},
-		},
-	})
-	volumes = append(volumes, kubev1.Volume{
-		Name: "libvirt-runtime",
-		VolumeSource: kubev1.VolumeSource{
-			EmptyDir: &kubev1.EmptyDirVolumeSource{},
-		},
-	})
 	containers = append(containers, container)
-	containers = append(containers, libvirtdContainer)
-	containers = append(containers, virtlogdContainer)
 
 	// TODO use constants for labels
 	pod := kubev1.Pod{
@@ -229,6 +192,7 @@ func (t *templateService) RenderLaunchManifest(vm *v1.VirtualMachine) (*kubev1.P
 			},
 		},
 		Spec: kubev1.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &kubev1.PodSecurityContext{
 				RunAsUser: &userId,
 			},

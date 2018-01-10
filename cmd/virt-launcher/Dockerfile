@@ -22,6 +22,7 @@ MAINTAINER "The KubeVirt Project" <kubevirt-dev@googlegroups.com>
 
 RUN dnf -y install \
   socat \
+  genisoimage \
   util-linux \
   libcgroup-tools \
   ethtool \
@@ -39,4 +40,6 @@ RUN rm -f /libvirtd.sh
 COPY libvirtd.sh /libvirtd.sh
 RUN chmod a+x /libvirtd.sh
 
-ENTRYPOINT [ "/virt-launcher" ]
+COPY entrypoint.sh /entrypoint.sh
+
+ENTRYPOINT [ "/entrypoint.sh" ]
