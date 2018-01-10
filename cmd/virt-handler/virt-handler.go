@@ -48,12 +48,11 @@ import (
 	"kubevirt.io/kubevirt/pkg/service"
 	"kubevirt.io/kubevirt/pkg/virt-handler"
 	"kubevirt.io/kubevirt/pkg/virt-handler/rest"
-	"kubevirt.io/kubevirt/pkg/virt-handler/virtwrap"
 	virt_api "kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/api"
-	virtcache "kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/cache"
 	virtcli "kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/cli"
 	"kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/isolation"
 	virtlauncher "kubevirt.io/kubevirt/pkg/virt-launcher"
+	virtcache "kubevirt.io/kubevirt/pkg/virt-launcher/cache"
 	watchdog "kubevirt.io/kubevirt/pkg/watchdog"
 )
 
@@ -133,10 +132,6 @@ func (app *virtHandlerApp) Run() {
 	// TODO what is scheme used for in Recorder?
 	recorder := broadcaster.NewRecorder(scheme.Scheme, k8sv1.EventSource{Component: "virt-handler", Host: app.HostOverride})
 
-	domainManager, err := virtwrap.NewLibvirtDomainManager(domainConn,
-		recorder,
-		isolation.NewSocketBasedIsolationDetector(app.VirtShareDir),
-	)
 	if err != nil {
 		panic(err)
 	}
@@ -181,7 +176,6 @@ func (app *virtHandlerApp) Run() {
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	vmController := virthandler.NewController(
-		domainManager,
 		recorder,
 		virtCli,
 		app.HostOverride,

@@ -21,16 +21,22 @@ package main
 
 import (
 	"flag"
-	"net"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
 	"github.com/spf13/pflag"
 
+	"github.com/libvirt/libvirt-go"
+
 	"kubevirt.io/kubevirt/pkg/log"
+	"kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/cache"
+	virtcli "kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/cli"
 	"kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/isolation"
 	virtlauncher "kubevirt.io/kubevirt/pkg/virt-launcher"
+	launcherserver "kubevirt.io/kubevirt/pkg/virt-launcher/launcher-server"
 	watchdog "kubevirt.io/kubevirt/pkg/watchdog"
 )
 
@@ -46,27 +52,117 @@ func markReady(readinessFile string) {
 	log.Log.Info("Marked as ready")
 }
 
-func createSocket(virtShareDir string, namespace string, name string) net.Listener {
-	sockFile := isolation.SocketFromNamespaceName(virtShareDir, namespace, name)
+func startLibvirt(stopChan chan struct{}) {
+	// we spawn libvirt from virt-launcher in order to ensure the libvirtd+qemu process
+	// doesn't exit until virt-launcher is ready for it to. Virt-launcher traps signals
+	// to perform special shutdown logic. These processes need to live in the same
+	// container.
 
-	err := os.MkdirAll(filepath.Dir(sockFile), 0755)
+	go func() {
+		for {
+			exitChan := make(chan struct{})
+			cmd := exec.Command("/libvirtd.sh")
+
+			err := cmd.Start()
+			if err != nil {
+				log.Log.Reason(err).Error("failed to start libvirtd")
+				panic(err)
+			}
+
+			go func() {
+				defer close(exitChan)
+				cmd.Wait()
+			}()
+
+			select {
+			case <-stopChan:
+				cmd.Process.Kill()
+				return
+			case <-exitChan:
+				log.Log.Errorf("libvirtd exited, restarting")
+			}
+
+			// this sleep is to avoid consumming all resources in the
+			// event of a libvirtd crash loop.
+			time.Sleep(time.Second)
+		}
+	}()
+}
+
+func startCmdServer(socketPath string, domainConn virtcli.Connection) {
+	err := os.MkdirAll(filepath.Dir(socketPath), 0755)
 	if err != nil {
 		log.Log.Reason(err).Error("Could not create directory for socket.")
 		panic(err)
 	}
 
-	if err := os.RemoveAll(sockFile); err != nil {
-		log.Log.Reason(err).Error("Could not clean up old socket for cgroup detection")
+	if err := os.RemoveAll(socketPath); err != nil {
+		log.Log.Reason(err).Error("Could not clean up virt-launcher cmd socket")
 		panic(err)
 	}
-	socket, err := net.Listen("unix", sockFile)
 
+	go func() {
+		err := launcherserver.Run(socketPath, domainConn)
+		if err != nil {
+			log.Log.Reason(err).Error("Failed to start virt-launcher cmd server")
+			panic(err)
+		}
+	}()
+
+}
+
+func createLibvirtConnection() virtcli.Connection {
+	libvirtUri := "qemu:///system"
+	domainConn, err := virtcli.NewConnection(libvirtUri, "", "", 10*time.Second)
 	if err != nil {
-		log.Log.Reason(err).Error("Could not create socket for cgroup detection.")
+		panic(fmt.Sprintf("failed to connect to libvirtd: %v", err))
+	}
+
+	return domainConn
+}
+
+func startDomainEventMonitoring(domainConn virtcli.Connection) {
+	libvirt.EventRegisterDefaultImpl()
+
+	go func() {
+		for {
+			if res := libvirt.EventRunDefaultImpl(); res != nil {
+				log.Log.Reason(res).Error("Listening to libvirt events failed, retrying.")
+				time.Sleep(time.Second)
+			}
+		}
+	}()
+
+	err := cache.StartNotifier(domainConn)
+	if err != nil {
 		panic(err)
 	}
 
-	return socket
+}
+
+func startWatchdogTicker(watchdogFile string, watchdogInterval time.Duration, stopChan chan struct{}) {
+	err := watchdog.WatchdogFileUpdate(watchdogFile)
+	if err != nil {
+		panic(err)
+	}
+
+	log.Log.Infof("Watchdog file created at %s", watchdogFile)
+
+	go func() {
+
+		ticker := time.NewTicker(watchdogInterval).C
+		for {
+			select {
+			case <-stopChan:
+				return
+			case <-ticker:
+				err := watchdog.WatchdogFileUpdate(watchdogFile)
+				if err != nil {
+					panic(err)
+				}
+			}
+		}
+	}()
 }
 
 func main() {
@@ -81,8 +177,8 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
-	socket := createSocket(*virtShareDir, *namespace, *name)
-	defer socket.Close()
+	stopChan := make(chan struct{})
+	defer close(stopChan)
 
 	err := virtlauncher.InitializeSharedDirectories(*virtShareDir)
 	if err != nil {
@@ -94,36 +190,27 @@ func main() {
 		panic(err)
 	}
 
-	watchdogFile := watchdog.WatchdogFileFromNamespaceName(*virtShareDir, *namespace, *name)
-	err = watchdog.WatchdogFileUpdate(watchdogFile)
-	if err != nil {
-		panic(err)
-	}
+	startLibvirt(stopChan)
 
-	log.Log.Infof("Watchdog file created at %s", watchdogFile)
+	domainConn := createLibvirtConnection()
+	defer domainConn.Close()
 
-	stopChan := make(chan struct{})
-	defer close(stopChan)
-	go func() {
+	startDomainEventMonitoring(domainConn)
 
-		ticker := time.NewTicker(*watchdogInterval).C
-		for {
-			select {
-			case <-stopChan:
-				return
-			case <-ticker:
-				err := watchdog.WatchdogFileUpdate(watchdogFile)
-				if err != nil {
-					panic(err)
-				}
-			}
-		}
-	}()
+	socketPath := isolation.SocketFromNamespaceName(*virtShareDir, *namespace, *name)
+	startCmdServer(socketPath, domainConn)
 
-	gracefulShutdownTriggerFile := virtlauncher.GracefulShutdownTriggerFromNamespaceName(*virtShareDir, *namespace, *name)
+	watchdogFile := watchdog.WatchdogFileFromNamespaceName(*virtShareDir,
+		*namespace,
+		*name)
+	startWatchdogTicker(watchdogFile, *watchdogInterval, stopChan)
+
+	gracefulShutdownTriggerFile := virtlauncher.GracefulShutdownTriggerFromNamespaceName(*virtShareDir,
+		*namespace,
+		*name)
 	err = virtlauncher.GracefulShutdownTriggerClear(gracefulShutdownTriggerFile)
 	if err != nil {
-		log.Log.Reason(err).Errorf("Error detected clearning graceful shutdown trigger file %s.", gracefulShutdownTriggerFile)
+		log.Log.Reason(err).Errorf("Error clearing shutdown trigger file %s.", gracefulShutdownTriggerFile)
 		panic(err)
 	}
 
@@ -131,4 +218,6 @@ func main() {
 
 	markReady(*readinessFile)
 	mon.RunForever(*qemuTimeout)
+
+	// TODO ensure exit domain event is received before shutting down virt-launcher
 }

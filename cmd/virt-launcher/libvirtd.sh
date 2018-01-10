@@ -87,8 +87,4 @@ fi
 
 echo "cgroup_controllers = [ ]" >>/etc/libvirt/qemu.conf
 
-if [[ -n "$LIBVIRTD_DISABLE_TCP" ]]; then
-    /usr/sbin/libvirtd
-else
-    /usr/sbin/libvirtd -l
-fi
+/usr/sbin/libvirtd 

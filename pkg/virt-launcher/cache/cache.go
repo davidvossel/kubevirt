@@ -35,7 +35,9 @@ import (
 	"kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/api"
 	"kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/cli"
 	"kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/errors"
+	"kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/isolation"
 	"kubevirt.io/kubevirt/pkg/virt-handler/virtwrap/util"
+	virtlauncherserver "kubevirt.io/kubevirt/pkg/virt-launcher/launcher-server"
 	notifierserver "kubevirt.io/kubevirt/pkg/virt-launcher/notifier-server"
 )
 
@@ -167,57 +169,30 @@ func newListWatchFromNotifier() *cache.ListWatch {
 			Items: []api.Domain{},
 		}
 
+		// TODO don't hardcode this
+		socketFiles, err := isolation.ListAllSockets("/var/run/kubevirt")
+		if err != nil {
+			return nil, err
+		}
+		for _, socketFile := range socketFiles {
+			client, err := virtlauncherserver.GetClient(socketFile)
+			if err != nil {
+				continue
+			}
+			defer client.Close()
+
+			domains, err := client.ListDomains()
+			if err != nil {
+				continue
+			}
+			for _, domain := range domains {
+				list.Items = append(list.Items, *domain)
+			}
+		}
 		return &list, nil
 	}
 	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
 		return newNotifierWatcher()
-	}
-	return &cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}
-}
-
-// NewListWatchFromClient creates a new ListWatch from the specified client, resource, namespace and field selector.
-func newListWatchFromClient(c cli.Connection, events ...int) *cache.ListWatch {
-	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
-		log.Log.V(3).Info("Synchronizing domains")
-		doms, err := c.ListAllDomains(libvirt.CONNECT_LIST_DOMAINS_ACTIVE | libvirt.CONNECT_LIST_DOMAINS_INACTIVE)
-		if err != nil {
-			return nil, err
-		}
-		list := api.DomainList{
-			Items: []api.Domain{},
-		}
-		// Whenever we gat a IsNotFound error, we just go on to the next Domain
-		for _, dom := range doms {
-			domain, err := NewDomain(dom)
-			if err != nil {
-				if errors.IsNotFound(err) {
-					continue
-				}
-				return nil, err
-			}
-			spec, err := util.GetDomainSpec(dom)
-			if err != nil {
-				if errors.IsNotFound(err) {
-					continue
-				}
-				return nil, err
-			}
-			domain.Spec = *spec
-			status, reason, err := dom.GetState()
-			if err != nil {
-				if errors.IsNotFound(err) {
-					continue
-				}
-				return nil, err
-			}
-			domain.SetState(convState(status), convReason(status, reason))
-			list.Items = append(list.Items, *domain)
-		}
-
-		return &list, nil
-	}
-	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
-		return newDomainWatcher(c, events...)
 	}
 	return &cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}
 }
@@ -232,25 +207,6 @@ func (d *DomainWatcher) Stop() {
 
 func (d *DomainWatcher) ResultChan() <-chan watch.Event {
 	return d.C
-}
-
-func newDomainWatcher(c cli.Connection, events ...int) (watch.Interface, error) {
-	watcher := &DomainWatcher{C: make(chan watch.Event)}
-	callback := func(c *libvirt.Connect, d *libvirt.Domain, event *libvirt.DomainEventLifecycle) {
-
-		// check for reconnects, and emit an error to force a resync
-		if event == nil {
-			watcher.C <- newWatchEventError(fmt.Errorf("Libvirt reconnect"))
-			return
-		}
-		log.Log.V(3).Infof("Libvirt event %d with reason %d received", event.Event, event.Detail)
-		callback(d, event, watcher.C)
-	}
-	err := c.DomainEventLifecycleRegister(callback)
-	if err != nil {
-		log.Log.V(2).Info("Lifecycle event callback registered.")
-	}
-	return watcher, err
 }
 
 // VMNamespaceKeyFunc constructs the domain name with a namespace prefix i.g.
@@ -287,54 +243,6 @@ func NewSharedInformer(c cli.Connection) (cache.SharedInformer, error) {
 	lw := newListWatchFromNotifier()
 	informer := cache.NewSharedInformer(lw, &api.Domain{}, 0)
 	return informer, nil
-}
-
-func callback(d cli.VirDomain, event *libvirt.DomainEventLifecycle, watcher chan watch.Event) {
-	domain, err := NewDomain(d)
-	if err != nil {
-		log.Log.Reason(err).Error("Could not create the Domain.")
-		watcher <- newWatchEventError(err)
-		return
-	}
-	log.Log.Infof("event received: %v:%v", event.Event, event.Detail)
-	// TODO In case of other events, it might not be enough to just send state and domainxml, maybe we have to embed the event and the details too
-	//      Think about device removal: First event is a DEFINED/UPDATED event and then we get the REMOVED event when it is done (is it that way?)
-
-	// No matter which event, try to fetch the domain xml and the state. If we get a IsNotFound error, that means that the VM was removed.
-	spec, err := util.GetDomainSpec(d)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			log.Log.Reason(err).Error("Could not fetch the Domain specification.")
-			watcher <- newWatchEventError(err)
-			return
-		}
-	} else {
-		domain.Spec = *spec
-		domain.ObjectMeta.UID = spec.Metadata.KubeVirt.UID
-	}
-	status, reason, err := d.GetState()
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			log.Log.Reason(err).Error("Could not fetch the Domain state.")
-			watcher <- newWatchEventError(err)
-			return
-		}
-		domain.SetState(api.NoState, api.ReasonNonExistent)
-	} else {
-		domain.SetState(convState(status), convReason(status, reason))
-	}
-
-	switch domain.Status.Reason {
-	case api.ReasonNonExistent:
-		watcher <- watch.Event{Type: watch.Deleted, Object: domain}
-	default:
-		if event.Event == libvirt.DOMAIN_EVENT_DEFINED && libvirt.DomainEventDefinedDetailType(event.Detail) == libvirt.DOMAIN_EVENT_DEFINED_ADDED {
-			watcher <- watch.Event{Type: watch.Added, Object: domain}
-		} else {
-			watcher <- watch.Event{Type: watch.Modified, Object: domain}
-		}
-	}
-
 }
 
 func convState(status libvirt.DomainState) api.LifeCycle {

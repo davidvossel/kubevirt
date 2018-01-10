@@ -345,6 +345,7 @@ func NewConnection(uri string, user string, pass string, checkInterval time.Dura
 		Connect: virConn, user: user, pass: pass, uri: uri, alive: true,
 		callbacks:     make([]libvirt.DomainEventLifecycleCallback, 0),
 		reconnectLock: &sync.Mutex{},
+		stop:          make(chan struct{}),
 	}
 	lvConn.installWatchdog(checkInterval)
 

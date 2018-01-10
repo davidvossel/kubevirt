@@ -28,6 +28,7 @@ package isolation
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -64,6 +65,20 @@ func NewSocketBasedIsolationDetector(virtShareDir string) PodIsolationDetector {
 	iso := &socketBasedIsolationDetector{virtShareDir: virtShareDir}
 	iso.controller = append(iso.controller, defaultControllers...)
 	return iso
+}
+
+func ListAllSockets(baseDir string) ([]string, error) {
+	var socketFiles []string
+
+	fileDir := filepath.Join(baseDir, "sockets")
+	files, err := ioutil.ReadDir(fileDir)
+	if err != nil {
+		return nil, err
+	}
+	for _, file := range files {
+		socketFiles = append(socketFiles, file.Name())
+	}
+	return socketFiles, nil
 }
 
 func SocketFromNamespaceName(baseDir string, namespace string, name string) string {

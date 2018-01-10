@@ -20,6 +20,7 @@
 package virtlauncher
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -30,6 +31,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"kubevirt.io/kubevirt/pkg/api/v1"
 	"kubevirt.io/kubevirt/pkg/log"
 )
 
@@ -193,6 +195,21 @@ var _ = Describe("VirtLauncher", func() {
 				}
 
 				Expect(exited).To(Equal(true))
+			})
+			It("verify client server works", func() {
+				socketPath := fmt.Sprintf("%s/%s", tmpDir, "launcher.sock")
+				go func() {
+					Run(socketPath)
+				}()
+
+				time.Sleep(time.Second)
+
+				client, err := GetClient(socketPath)
+				Expect(err).ToNot(HaveOccurred())
+
+				vm := v1.NewMinimalVM("testvm")
+				err = client.StartVirtualMachine(vm)
+				Expect(err).ToNot(HaveOccurred())
 			})
 		})
 	})
