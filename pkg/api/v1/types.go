@@ -22,6 +22,7 @@ package v1
 //go:generate swagger-doc
 //go:generate deepcopy-gen -i . --go-header-file ../../../hack/boilerplate/boilerplate.go.txt
 //go:generate defaulter-gen -i . --go-header-file ../../../hack/boilerplate/boilerplate.go.txt
+//go:generate openapi-gen -i . --output-package=kubevirt.io/kubevirt/pkg/api/v1  --go-header-file ../../../hack/boilerplate/boilerplate.go.txt
 
 /*
  ATTENTION: Rerun code generators when comments on structs or fields are modified.
@@ -102,6 +103,7 @@ func init() {
 
 // VirtualMachine is *the* VM Definition. It represents a virtual machine in the runtime environment of kubernetes.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:openapi-gen=true
 type VirtualMachine struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -120,6 +122,7 @@ type VirtualMachineList struct {
 }
 
 // VirtualMachineSpec is a description of a VirtualMachine.
+// +k8s:openapi-gen=true
 type VirtualMachineSpec struct {
 	// Specification of the desired behavior of the VirtualMachine on the host.
 	Domain DomainSpec `json:"domain"`
@@ -137,6 +140,7 @@ type VirtualMachineSpec struct {
 }
 
 // Affinity groups all the affinity rules related to a VM
+// +k8s:openapi-gen=true
 type Affinity struct {
 	// Node affinity support
 	NodeAffinity *k8sv1.NodeAffinity `json:"nodeAffinity,omitempty"`
@@ -144,6 +148,7 @@ type Affinity struct {
 
 // VirtualMachineStatus represents information about the status of a VM. Status may trail the actual
 // state of a system.
+// +k8s:openapi-gen=true
 type VirtualMachineStatus struct {
 	// NodeName is the name where the VM is currently running.
 	NodeName string `json:"nodeName,omitempty"`
@@ -233,6 +238,7 @@ const (
 	VirtualMachineSynchronized VirtualMachineConditionType = "Synchronized"
 )
 
+// +k8s:openapi-gen=true
 type VirtualMachineCondition struct {
 	Type               VirtualMachineConditionType `json:"type"`
 	Status             k8sv1.ConditionStatus       `json:"status"`

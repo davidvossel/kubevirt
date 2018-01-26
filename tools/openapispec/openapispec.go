@@ -24,10 +24,15 @@ import (
 	"flag"
 	"io/ioutil"
 	"log"
+	"strings"
 
 	"github.com/emicklei/go-restful-openapi"
+	"github.com/go-openapi/spec"
 	"github.com/spf13/pflag"
 
+	"k8s.io/kube-openapi/pkg/common"
+
+	"kubevirt.io/kubevirt/pkg/api/v1"
 	klog "kubevirt.io/kubevirt/pkg/log"
 	"kubevirt.io/kubevirt/pkg/virt-api"
 )
@@ -44,8 +49,39 @@ func dumpOpenApiSpec(dumppath *string) {
 	}
 }
 
+func dumpOpenApiSpecV3(dumppath *string) {
+
+	getDefinitionName := func(name string) (string, spec.Extensions) {
+		return name[strings.LastIndex(name, "/")+1:], nil
+	}
+
+	getRef := func(name string) spec.Ref {
+		defName, _ := getDefinitionName(name)
+		return spec.MustCreateRef("#/definitions/" + common.EscapeJsonPointer(defName))
+	}
+
+	definitions := v1.GetOpenAPIDefinitions(getRef)
+
+	// TODO /vendor/k8s.io/kube-openapi/pkg/builder/openapi.go
+	// look at buildDefinitionRecursively.
+	// Basically you want to give a name, like "v1.VirtualMachine" and for it
+	// to build all the definitions specific to that object.
+	// https://kubernetes.io/docs/tasks/access-kubernetes-api/extend-api-custom-resource-definitions/#validation
+	// https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md
+
+	data, err := json.MarshalIndent(definitions, " ", " ")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = ioutil.WriteFile(*dumppath, data, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func main() {
 	dumpapispecpath := flag.String("dump-api-spec-path", "openapi.json", "Path to OpenApi dump.")
+	dumpapispecv3path := flag.String("dump-api-spec-v3-path", "openapi-v3.json", "Path to OpenApiV3 dump.")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	// client-go requires a config or a master to be set in order to configure a client
 	pflag.Set("master", "http://127.0.0.1:4321")
@@ -57,4 +93,5 @@ func main() {
 	app := virt_api.VirtAPIApp{}
 	app.Compose()
 	dumpOpenApiSpec(dumpapispecpath)
+	dumpOpenApiSpecV3(dumpapispecv3path)
 }
