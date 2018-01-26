@@ -26,6 +26,7 @@ RUN \
     go get -u github.com/onsi/ginkgo/ginkgo && \
     go get -u -d k8s.io/code-generator/cmd/deepcopy-gen && \
     go get -u -d k8s.io/code-generator/cmd/defaulter-gen && \
+    go get -u -d k8s.io/code-generator/cmd/openapi-gen && \
     cd /go/src/k8s.io/code-generator/cmd/deepcopy-gen && \
     git checkout release-1.9 && \
     go install && \
