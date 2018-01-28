@@ -171,7 +171,6 @@ func (t *templateService) RenderLaunchManifest(vm *v1.VirtualMachine) (*kubev1.P
 			},
 		},
 		Spec: kubev1.PodSpec{
-			HostNetwork: true,
 			SecurityContext: &kubev1.PodSecurityContext{
 				RunAsUser: &userId,
 			},
