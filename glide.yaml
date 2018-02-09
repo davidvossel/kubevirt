@@ -11,6 +11,7 @@ ignore:
 - k8s.io/client-go/listers/autoscaling/v2alpha1
 - k8s.io/api/autoscaling/v2alpha1
 - k8s.io/kube-openapi/pkg/util/proto
+- k8s.io/apimachinery/pkg/apis/meta/v1beta1
 - github.com/coreos/etcd
 - github.com/gogo/protobuf/test/typedeclimport/subpkg
 - github.com/gogo/protobuf/test/issue312

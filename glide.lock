@@ -1,8 +1,8 @@
-hash: 06b621ed01682c157caa1fd118f01df881ec21661b84ae6dab764f175b1f1c60
-updated: 2018-02-06T01:33:45.073339828-05:00
+hash: b6e2b1529c4816711b5b7329de0f0f938b2f41f9f4b05200a2848db81077e5fa
+updated: 2018-02-09T20:00:17.40776049Z
 imports:
 - name: github.com/asaskevich/govalidator
-  version: f682aee18e37332521b3c3ef4cba9ddb9b516b09
+  version: 4b3d68f87f176641ffc147420296013aff66ea32
 - name: github.com/davecgh/go-spew
   version: 782f4967f2dc4564575ca782fe2d04090b5faca8
   subpackages:
@@ -16,7 +16,7 @@ imports:
   subpackages:
   - log
 - name: github.com/emicklei/go-restful-openapi
-  version: 0d037b269a5b53b582789e25dee0d0a0614119e5
+  version: 70524064aab17ece0fb3d63ff713db8853f38862
 - name: github.com/emicklei/go-restful-swagger12
   version: dcef7f55730566d41eae5db10e7d6981829720f6
 - name: github.com/evanphx/json-patch
@@ -55,11 +55,11 @@ imports:
   subpackages:
   - lru
 - name: github.com/golang/mock
-  version: a18247b9451da0d13e80f7c3e320f1b101d7ea1e
+  version: b3e60bcdc577185fce3cf625fc96b62857ce5574
   subpackages:
   - gomock
 - name: github.com/golang/protobuf
-  version: 4bd1920723d7b7c925de087aa32e2187708897f7
+  version: 1643683e1b54a9e88ad26d98f81400c8c9d9f4f9
   subpackages:
   - proto
   - ptypes
@@ -95,7 +95,7 @@ imports:
 - name: github.com/imdario/mergo
   version: 6633656539c1639d9d78127b7d47c622b5d7b6dc
 - name: github.com/json-iterator/go
-  version: 36b14963da70d11297d313183d7e6388c8510e1e
+  version: 13f86432b882000a51c6e610c620974462691a97
 - name: github.com/juju/ratelimit
   version: 5b9ff866471762aa2ab2dced63c9fb6f53921342
 - name: github.com/kr/logfmt
@@ -105,7 +105,7 @@ imports:
   subpackages:
   - conn
 - name: github.com/libvirt/libvirt-go
-  version: 4a36356705fc68ccbe3e8724e0087cceefcdf3f0
+  version: b8570d1869813105e8fb57b728900a98291658f7
 - name: github.com/mailru/easyjson
   version: 2a92e673c9a6302dd05c3a691ae1f24aef46457d
   subpackages:
@@ -113,7 +113,7 @@ imports:
   - jlexer
   - jwriter
 - name: github.com/onsi/ginkgo
-  version: 652e15c9a27e1cec563e065568014f29eecf6bd9
+  version: 11459a886d9cd66b319dac7ef1e917ee221372c9
   subpackages:
   - config
   - extensions/table
@@ -134,7 +134,7 @@ imports:
   - reporters/stenographer/support/go-isatty
   - types
 - name: github.com/onsi/gomega
-  version: 1eecca0ba8e6f5ea5a431ce21d3aee2af0b4c90b
+  version: dcabb60a477c2b6f456df65037cb6708210fbb02
   subpackages:
   - format
   - ghttp
@@ -157,11 +157,11 @@ imports:
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
 - name: github.com/spf13/pflag
-  version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
+  version: 4c012f6dcd9546820e378d0bdda4d8fc772cdfea
 - name: github.com/subgraph/libmacouflage
   version: 973191b8743358463d8f3abc9c6dc585f2c1e7fc
 - name: github.com/vishvananda/netlink
-  version: a2af46a09c21dd8b727a0f8912e559b8b484144d
+  version: d35d6b58e1cb692b27b94fc403170bf44058ac3e
   subpackages:
   - nl
 - name: github.com/vishvananda/netns
@@ -190,6 +190,7 @@ imports:
   - internal/socket
   - ipv4
   - lex/httplex
+  - websocket
 - name: golang.org/x/sys
   version: 7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce
   subpackages:
@@ -221,7 +222,7 @@ imports:
   - unicode/norm
   - width
 - name: google.golang.org/grpc
-  version: d6cc72862b0b65125e2dbb02e207bacfad792e69
+  version: d50734d1d6ca477a72646f3022216ec39639f4cd
   subpackages:
   - codes
 - name: gopkg.in/inf.v0
@@ -229,7 +230,7 @@ imports:
 - name: gopkg.in/ini.v1
   version: 32e4c1e6bc4e7d0d8451aa6b75200d19e37a536a
 - name: gopkg.in/yaml.v2
-  version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
+  version: 670d4cfef0544295bc27a114dbac37980d83185a
 - name: k8s.io/api
   version: 6c6dac0277229b9e9578c5ca3f74a4345d35cdc2
   subpackages:
@@ -395,9 +396,10 @@ imports:
   - util/integer
   - util/workqueue
 - name: k8s.io/kube-openapi
-  version: 868f2f29720b192240e18284659231b440f9cda5
+  version: a07b7bbb58e7fdc5144f8d7046331d29fc9ad3b3
   subpackages:
   - pkg/common
+  - pkg/util/proto
 testImports:
 - name: github.com/elazarl/goproxy
   version: 07b16b6e30fcac0ad8c0435548e743bcf2ca7e92
