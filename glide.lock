@@ -1,8 +1,12 @@
-hash: 3607077064bf003c8eaaa2f615c5f1112c5aa61fd3e15e4f27c6ae5c5dd034fe
-updated: 2018-03-22T13:47:56.069155123Z
+hash: 5d9b28b751ad2125c4753d698715b209eb49c73012144c7fda8e6f002a0e8fdf
+updated: 2018-03-27T20:03:06.70879623Z
 imports:
+- name: github.com/ant31/crd-validation
+  version: eabcf70a1bd73e9296fa0c5f57de604689200a1b
+  subpackages:
+  - pkg
 - name: github.com/asaskevich/govalidator
-  version: 7d2e70ef918f16bd6455529af38304d6d025c952
+  version: 593d64559f7600f29581a3ee42177f5dbded27a9
 - name: github.com/davecgh/go-spew
   version: 782f4967f2dc4564575ca782fe2d04090b5faca8
   subpackages:
@@ -49,7 +53,7 @@ imports:
   - proto
   - sortkeys
 - name: github.com/golang/glog
-  version: 44145f04b68cf362d9c4df2182967c2275eaefed
+  version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - name: github.com/golang/groupcache
   version: 02826c3e79038b59d737d3b1c0a1d937f71a4433
   subpackages:
@@ -82,6 +86,8 @@ imports:
   - OpenAPIv2
   - compiler
   - extensions
+- name: github.com/gorilla/websocket
+  version: eb925808374e5ca90c83401a40d711dc08c0c0f6
 - name: github.com/gregjones/httpcache
   version: 787624de3eb7bd915c329cba748687a3b22666a6
   subpackages:
@@ -157,7 +163,7 @@ imports:
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
 - name: github.com/spf13/pflag
-  version: ee5fd03fd6acfd43e44aea0b4135958546ed8e73
+  version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
 - name: github.com/subgraph/libmacouflage
   version: 973191b8743358463d8f3abc9c6dc585f2c1e7fc
 - name: github.com/vishvananda/netlink
@@ -190,7 +196,6 @@ imports:
   - internal/socket
   - ipv4
   - lex/httplex
-  - websocket
 - name: golang.org/x/sys
   version: 95c6576299259db960f6c5b9b69ea52422860fce
   subpackages:
@@ -222,7 +227,7 @@ imports:
   - unicode/norm
   - width
 - name: google.golang.org/grpc
-  version: dfbefc6795cd46d1b52c409c02bcd4230fbf8cfd
+  version: d2e1b51f33ff8c5e4a15560ff049d200e83726c5
   subpackages:
   - codes
 - name: gopkg.in/inf.v0
@@ -262,6 +267,11 @@ imports:
   - storage/v1
   - storage/v1alpha1
   - storage/v1beta1
+- name: k8s.io/apiextensions-apiserver
+  version: 4b903ca6c8a2031b8f88c3d1fbefa8eb248b103c
+  subpackages:
+  - pkg/apis/apiextensions
+  - pkg/apis/apiextensions/v1beta1
 - name: k8s.io/apimachinery
   version: 180eddb345a5be3a157cea1c624700ad5bd27b8f
   subpackages:

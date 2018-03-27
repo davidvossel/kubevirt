@@ -32,6 +32,9 @@ RUN \
     go install && \
     cd /go/src/k8s.io/code-generator/cmd/defaulter-gen && \
     git checkout release-1.9 && \
+    go install && \
+    cd /go/src/k8s.io/code-generator/cmd/openapi-gen && \
+    git checkout release-1.9 && \
     go install
 
 ADD entrypoint.sh /entrypoint.sh

@@ -16,8 +16,8 @@
   "kubevirt.io/kubevirt/pkg/api/v1.CDRomTarget": {
    "Schema": {
     "properties": {
-     "dev": {
-      "description": "Device indicates the \"logical\" device name. The actual device name specified is not guaranteed to map to the device name in the guest OS. Treat it as a device ordering hint.",
+     "bus": {
+      "description": "Bus indicates the type of disk device to emulate. supported values: virtio, sata, scsi, ide",
       "type": "string"
      },
      "readonly": {
@@ -101,6 +101,10 @@
      "secretRef": {
       "description": "UserDataSecretRef references a k8s secret that contains NoCloud userdata",
       "$ref": "#/definitions/v1.LocalObjectReference"
+     },
+     "userData": {
+      "description": "UserData contains NoCloud inline cloud-init userdata",
+      "type": "string"
      },
      "userDataBase64": {
       "description": "UserDataBase64 contains NoCloud cloud-init userdata as a base64 encoded string",
@@ -205,8 +209,8 @@
   "kubevirt.io/kubevirt/pkg/api/v1.DiskTarget": {
    "Schema": {
     "properties": {
-     "dev": {
-      "description": "Device indicates the \"logical\" device name. The actual device name specified is not guaranteed to map to the device name in the guest OS. Treat it as a device ordering hint.",
+     "bus": {
+      "description": "Bus indicates the type of disk device to emulate. supported values: virtio, sata, scsi, ide",
       "type": "string"
      },
      "readonly": {
@@ -263,6 +267,19 @@
     "kubevirt.io/kubevirt/pkg/api/v1.ResourceRequirements"
    ]
   },
+  "kubevirt.io/kubevirt/pkg/api/v1.EphemeralVolumeSource": {
+   "Schema": {
+    "properties": {
+     "persistentVolumeClaim": {
+      "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. Directly attached to the vm via qemu. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
+      "$ref": "#/definitions/v1.PersistentVolumeClaimVolumeSource"
+     }
+    }
+   },
+   "Dependencies": [
+    "k8s.io/api/core/v1.PersistentVolumeClaimVolumeSource"
+   ]
+  },
   "kubevirt.io/kubevirt/pkg/api/v1.FeatureAPIC": {
    "Schema": {
     "properties": {
@@ -307,7 +324,7 @@
       "$ref": "#/definitions/v1.FeatureState"
      },
      "vapic": {
-      "description": "VAPIC indicates weather virtual APIC is enabled Defaults to the machine type setting",
+      "description": "VAPIC indicates whether virtual APIC is enabled Defaults to the machine type setting",
       "$ref": "#/definitions/v1.FeatureState"
      },
      "vendorid": {
@@ -378,7 +395,7 @@
      },
      "apic": {
       "description": "Defaults to the machine type setting",
-      "$ref": "#/definitions/v1.FeatureState"
+      "$ref": "#/definitions/v1.FeatureAPIC"
      },
      "hyperv": {
       "description": "Defaults to the machine type setting",
@@ -387,6 +404,7 @@
     }
    },
    "Dependencies": [
+    "kubevirt.io/kubevirt/pkg/api/v1.FeatureAPIC",
     "kubevirt.io/kubevirt/pkg/api/v1.FeatureHyperv",
     "kubevirt.io/kubevirt/pkg/api/v1.FeatureState"
    ]
@@ -394,8 +412,8 @@
   "kubevirt.io/kubevirt/pkg/api/v1.Firmware": {
    "Schema": {
     "properties": {
-     "uid": {
-      "description": "UID reported by the vm bios Defaults to a random generated uid",
+     "uuid": {
+      "description": "UUID reported by the vm bios Defaults to a random generated uid",
       "type": "string"
      }
     }
@@ -405,10 +423,6 @@
   "kubevirt.io/kubevirt/pkg/api/v1.FloppyTarget": {
    "Schema": {
     "properties": {
-     "dev": {
-      "description": "Device indicates the \"logical\" device name. The actual device name specified is not guaranteed to map to the device name in the guest OS. Treat it as a device ordering hint.",
-      "type": "string"
-     },
      "readonly": {
       "description": "ReadOnly Defaults to false",
       "type": "boolean"
@@ -473,8 +487,8 @@
   "kubevirt.io/kubevirt/pkg/api/v1.LunTarget": {
    "Schema": {
     "properties": {
-     "dev": {
-      "description": "Device indicates the \"logical\" device name. The actual device name specified is not guaranteed to map to the device name in the guest OS. Treat it as a device ordering hint.",
+     "bus": {
+      "description": "Bus indicates the type of disk device to emulate. supported values: virtio, sata, scsi, ide",
       "type": "string"
      },
      "readonly": {
@@ -498,6 +512,141 @@
     }
    },
    "Dependencies": []
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.OfflineVirtualMachine": {
+   "Schema": {
+    "description": "OfflineVirtualMachine handles the VirtualMachines that are not running or are in a stopped state The OfflineVirtualMachine contains the template to create the VirtualMachine. It also mirrors the running state of the created VirtualMachine in its status.",
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec contains the specification of VirtualMachine created",
+      "$ref": "#/definitions/v1.OfflineVirtualMachineSpec"
+     },
+     "status": {
+      "description": "Status holds the current state of the controller and brief information about its associated VirtualMachine",
+      "$ref": "#/definitions/v1.OfflineVirtualMachineStatus"
+     }
+    }
+   },
+   "Dependencies": [
+    "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta",
+    "kubevirt.io/kubevirt/pkg/api/v1.OfflineVirtualMachineSpec",
+    "kubevirt.io/kubevirt/pkg/api/v1.OfflineVirtualMachineStatus"
+   ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.OfflineVirtualMachineCondition": {
+   "Schema": {
+    "description": "OfflineVirtualMachineCondition represents the state of OfflineVirtualMachine",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastProbeTime": {
+      "$ref": "#/definitions/v1.Time"
+     },
+     "lastTransitionTime": {
+      "$ref": "#/definitions/v1.Time"
+     },
+     "message": {
+      "type": "string"
+     },
+     "reason": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "type": {
+      "type": "string"
+     }
+    }
+   },
+   "Dependencies": [
+    "k8s.io/apimachinery/pkg/apis/meta/v1.Time"
+   ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.OfflineVirtualMachineList": {
+   "Schema": {
+    "description": "OfflineVirtualMachineList is a list of offlinevirtualmachines",
+    "required": [
+     "metadata",
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "items": {
+      "description": "Items is a list of OfflineVirtualMachines",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.OfflineVirtualMachine"
+      }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/v1.ListMeta"
+     }
+    }
+   },
+   "Dependencies": [
+    "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta",
+    "kubevirt.io/kubevirt/pkg/api/v1.OfflineVirtualMachine"
+   ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.OfflineVirtualMachineSpec": {
+   "Schema": {
+    "description": "OfflineVirtualMachineSpec describes how the proper OfflineVirtualMachine should look like",
+    "required": [
+     "running",
+     "template"
+    ],
+    "properties": {
+     "running": {
+      "description": "Running controlls whether the associatied VirtualMachine is created or not",
+      "type": "boolean"
+     },
+     "template": {
+      "description": "Template is the direct specification of VirtualMachine",
+      "$ref": "#/definitions/v1.VMTemplateSpec"
+     }
+    }
+   },
+   "Dependencies": [
+    "kubevirt.io/kubevirt/pkg/api/v1.VMTemplateSpec"
+   ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.OfflineVirtualMachineStatus": {
+   "Schema": {
+    "description": "OfflineVirtualMachineStatus represents the status returned by the controller to describe how the OfflineVirtualMachine is doing",
+    "properties": {
+     "conditions": {
+      "description": "Hold the state information of the OfflineVirtualMachine and its VirtualMachine",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.OfflineVirtualMachineCondition"
+      }
+     }
+    }
+   },
+   "Dependencies": [
+    "kubevirt.io/kubevirt/pkg/api/v1.OfflineVirtualMachineCondition"
+   ]
   },
   "kubevirt.io/kubevirt/pkg/api/v1.PITTimer": {
    "Schema": {
@@ -543,6 +692,10 @@
      "image": {
       "description": "Image is the name of the image with the embedded disk",
       "type": "string"
+     },
+     "imagePullSecret": {
+      "description": "ImagePullSecret is the name of the Docker registry secret required to pull the image. The secret must already exist.",
+      "type": "string"
      }
     }
    },
@@ -551,6 +704,13 @@
   "kubevirt.io/kubevirt/pkg/api/v1.ResourceRequirements": {
    "Schema": {
     "properties": {
+     "limits": {
+      "description": "Limits describes the maximum amount of compute resources allowed. Valid resource keys are \"memory\" and \"cpu\".",
+      "type": "object",
+      "additionalProperties": {
+       "$ref": "#/definitions/resource.Quantity"
+      }
+     },
      "requests": {
       "description": "Requests is a description of the initial vm resources. Valid resource keys are \"memory\" and \"cpu\".",
       "type": "object",
@@ -563,6 +723,55 @@
    "Dependencies": [
     "k8s.io/apimachinery/pkg/api/resource.Quantity"
    ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.Spice": {
+   "Schema": {
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "info": {
+      "$ref": "#/definitions/v1.SpiceInfo"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/v1.ObjectMeta"
+     }
+    }
+   },
+   "Dependencies": [
+    "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta",
+    "kubevirt.io/kubevirt/pkg/api/v1.SpiceInfo"
+   ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.SpiceInfo": {
+   "Schema": {
+    "required": [
+     "type",
+     "host",
+     "port"
+    ],
+    "properties": {
+     "host": {
+      "type": "string"
+     },
+     "port": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "proxy": {
+      "type": "string"
+     },
+     "type": {
+      "type": "string"
+     }
+    }
+   },
+   "Dependencies": []
   },
   "kubevirt.io/kubevirt/pkg/api/v1.Timer": {
    "Schema": {
@@ -596,6 +805,123 @@
     "kubevirt.io/kubevirt/pkg/api/v1.KVMTimer",
     "kubevirt.io/kubevirt/pkg/api/v1.PITTimer",
     "kubevirt.io/kubevirt/pkg/api/v1.RTCTimer"
+   ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.VMReplicaSetCondition": {
+   "Schema": {
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastProbeTime": {
+      "$ref": "#/definitions/v1.Time"
+     },
+     "lastTransitionTime": {
+      "$ref": "#/definitions/v1.Time"
+     },
+     "message": {
+      "type": "string"
+     },
+     "reason": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "type": {
+      "type": "string"
+     }
+    }
+   },
+   "Dependencies": [
+    "k8s.io/apimachinery/pkg/apis/meta/v1.Time"
+   ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.VMReplicaSetSpec": {
+   "Schema": {
+    "required": [
+     "template"
+    ],
+    "properties": {
+     "paused": {
+      "description": "Indicates that the replica set is paused.",
+      "type": "boolean"
+     },
+     "replicas": {
+      "description": "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "selector": {
+      "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
+      "$ref": "#/definitions/v1.LabelSelector"
+     },
+     "template": {
+      "description": "Template describes the pods that will be created.",
+      "$ref": "#/definitions/v1.VMTemplateSpec"
+     }
+    }
+   },
+   "Dependencies": [
+    "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector",
+    "kubevirt.io/kubevirt/pkg/api/v1.VMTemplateSpec"
+   ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.VMReplicaSetStatus": {
+   "Schema": {
+    "properties": {
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.VMReplicaSetCondition"
+      }
+     },
+     "readyReplicas": {
+      "description": "The number of ready replicas for this replica set.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "replicas": {
+      "description": "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "Dependencies": [
+    "kubevirt.io/kubevirt/pkg/api/v1.VMReplicaSetCondition"
+   ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.VMSelector": {
+   "Schema": {
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "description": "Name of the VM to migrate",
+      "type": "string"
+     }
+    }
+   },
+   "Dependencies": []
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.VMTemplateSpec": {
+   "Schema": {
+    "properties": {
+     "metadata": {
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "VM Spec contains the VM specification.",
+      "$ref": "#/definitions/v1.VirtualMachineSpec"
+     }
+    }
+   },
+   "Dependencies": [
+    "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta",
+    "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachineSpec"
    ]
   },
   "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachine": {
@@ -660,6 +986,191 @@
     "k8s.io/apimachinery/pkg/apis/meta/v1.Time"
    ]
   },
+  "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachineList": {
+   "Schema": {
+    "description": "VirtualMachineList is a list of VirtualMachines",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.VirtualMachine"
+      }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/v1.ListMeta"
+     }
+    }
+   },
+   "Dependencies": [
+    "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta",
+    "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachine"
+   ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachineNetworkInterface": {
+   "Schema": {
+    "properties": {
+     "ipAddress": {
+      "description": "IP address of a Virtual Machine interface",
+      "type": "string"
+     },
+     "mac": {
+      "description": "Hardware address of a Virtual Machine interface",
+      "type": "string"
+     }
+    }
+   },
+   "Dependencies": []
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachinePreset": {
+   "Schema": {
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "VM Spec contains the VM specification.",
+      "$ref": "#/definitions/v1.VirtualMachinePresetSpec"
+     }
+    }
+   },
+   "Dependencies": [
+    "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta",
+    "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachinePresetSpec"
+   ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachinePresetList": {
+   "Schema": {
+    "description": "VirtualMachinePresetList is a list of VirtualMachinePresets",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.VirtualMachinePreset"
+      }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/v1.ListMeta"
+     }
+    }
+   },
+   "Dependencies": [
+    "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta",
+    "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachinePreset"
+   ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachinePresetSpec": {
+   "Schema": {
+    "required": [
+     "selector"
+    ],
+    "properties": {
+     "domain": {
+      "description": "Domain is the same object type as contained in VirtualMachineSpec",
+      "$ref": "#/definitions/v1.DomainSpec"
+     },
+     "selector": {
+      "description": "Selector is a label query over a set of VMs. Required.",
+      "$ref": "#/definitions/v1.LabelSelector"
+     }
+    }
+   },
+   "Dependencies": [
+    "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector",
+    "kubevirt.io/kubevirt/pkg/api/v1.DomainSpec"
+   ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachineReplicaSet": {
+   "Schema": {
+    "description": "VM is *the* VM Definition. It represents a virtual machine in the runtime environment of kubernetes.",
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "VM Spec contains the VM specification.",
+      "$ref": "#/definitions/v1.VMReplicaSetSpec"
+     },
+     "status": {
+      "description": "Status is the high level overview of how the VM is doing. It contains information available to controllers and users.",
+      "$ref": "#/definitions/v1.VMReplicaSetStatus"
+     }
+    }
+   },
+   "Dependencies": [
+    "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta",
+    "kubevirt.io/kubevirt/pkg/api/v1.VMReplicaSetSpec",
+    "kubevirt.io/kubevirt/pkg/api/v1.VMReplicaSetStatus"
+   ]
+  },
+  "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachineReplicaSetList": {
+   "Schema": {
+    "description": "VMList is a list of VMs",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.VirtualMachineReplicaSet"
+      }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/v1.ListMeta"
+     }
+    }
+   },
+   "Dependencies": [
+    "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta",
+    "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachineReplicaSet"
+   ]
+  },
   "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachineSpec": {
    "Schema": {
     "description": "VirtualMachineSpec is a description of a VirtualMachine.",
@@ -713,9 +1224,12 @@
        "$ref": "#/definitions/v1.VirtualMachineCondition"
       }
      },
-     "migrationNodeName": {
-      "description": "MigrationNodeName is the node where the VM is live migrating to.",
-      "type": "string"
+     "interfaces": {
+      "description": "Interfaces represent the details of available network interfaces.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.VirtualMachineNetworkInterface"
+      }
      },
      "nodeName": {
       "description": "NodeName is the name where the VM is currently running.",
@@ -728,7 +1242,8 @@
     }
    },
    "Dependencies": [
-    "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachineCondition"
+    "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachineCondition",
+    "kubevirt.io/kubevirt/pkg/api/v1.VirtualMachineNetworkInterface"
    ]
   },
   "kubevirt.io/kubevirt/pkg/api/v1.Volume": {
@@ -742,9 +1257,9 @@
       "description": "CloudInitNoCloud represents a cloud-init NoCloud user-data source. The NoCloud data will be added as a disk to the vm. A proper cloud-init installation is required inside the guest. More info: http://cloudinit.readthedocs.io/en/latest/topics/datasources/nocloud.html",
       "$ref": "#/definitions/v1.CloudInitNoCloudSource"
      },
-     "iscsi": {
-      "description": "ISCSI represents an ISCSI Disk resource which is directly attached to the vm via qemu.",
-      "$ref": "#/definitions/v1.ISCSIVolumeSource"
+     "ephemeral": {
+      "description": "Ephemeral is a special volume source that \"wraps\" specified source and provides copy-on-write image on top of it.",
+      "$ref": "#/definitions/v1.EphemeralVolumeSource"
      },
      "name": {
       "description": "Volume's name. Must be a DNS_LABEL and unique within the vm. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
@@ -761,9 +1276,9 @@
     }
    },
    "Dependencies": [
-    "k8s.io/api/core/v1.ISCSIVolumeSource",
     "k8s.io/api/core/v1.PersistentVolumeClaimVolumeSource",
     "kubevirt.io/kubevirt/pkg/api/v1.CloudInitNoCloudSource",
+    "kubevirt.io/kubevirt/pkg/api/v1.EphemeralVolumeSource",
     "kubevirt.io/kubevirt/pkg/api/v1.RegistryDiskSource"
    ]
   },
@@ -775,9 +1290,9 @@
       "description": "CloudInitNoCloud represents a cloud-init NoCloud user-data source. The NoCloud data will be added as a disk to the vm. A proper cloud-init installation is required inside the guest. More info: http://cloudinit.readthedocs.io/en/latest/topics/datasources/nocloud.html",
       "$ref": "#/definitions/v1.CloudInitNoCloudSource"
      },
-     "iscsi": {
-      "description": "ISCSI represents an ISCSI Disk resource which is directly attached to the vm via qemu.",
-      "$ref": "#/definitions/v1.ISCSIVolumeSource"
+     "ephemeral": {
+      "description": "Ephemeral is a special volume source that \"wraps\" specified source and provides copy-on-write image on top of it.",
+      "$ref": "#/definitions/v1.EphemeralVolumeSource"
      },
      "persistentVolumeClaim": {
       "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. Directly attached to the vm via qemu. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
@@ -790,9 +1305,9 @@
     }
    },
    "Dependencies": [
-    "k8s.io/api/core/v1.ISCSIVolumeSource",
     "k8s.io/api/core/v1.PersistentVolumeClaimVolumeSource",
     "kubevirt.io/kubevirt/pkg/api/v1.CloudInitNoCloudSource",
+    "kubevirt.io/kubevirt/pkg/api/v1.EphemeralVolumeSource",
     "kubevirt.io/kubevirt/pkg/api/v1.RegistryDiskSource"
    ]
   },

@@ -170,6 +170,7 @@ type FloppyTarget struct {
 }
 
 // TrayState indicates if a tray of a cdrom or floppy is open or closed
+// +k8s:openapi-gen=true
 type TrayState string
 
 const (
@@ -229,6 +230,7 @@ type VolumeSource struct {
 	Ephemeral *EphemeralVolumeSource `json:"ephemeral,omitempty"`
 }
 
+// +k8s:openapi-gen=true
 type EphemeralVolumeSource struct {
 	// PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace.
 	// Directly attached to the vm via qemu.
@@ -295,12 +297,15 @@ type Timer struct {
 }
 
 // HPETTickPolicy determines what happens when QEMU misses a deadline for injecting a tick to the guest
+// +k8s:openapi-gen=true
 type HPETTickPolicy string
 
 // PITTickPolicy determines what happens when QEMU misses a deadline for injecting a tick to the guest
+// +k8s:openapi-gen=true
 type PITTickPolicy string
 
 // RTCTickPolicy determines what happens when QEMU misses a deadline for injecting a tick to the guest
+// +k8s:openapi-gen=true
 type RTCTickPolicy string
 
 const (
@@ -335,6 +340,7 @@ const (
 )
 
 // RTCTimerTrack specifies from which source to track the time
+// +k8s:openapi-gen=true
 type RTCTimerTrack string
 
 const (
@@ -495,6 +501,7 @@ type FeatureHyperv struct {
 }
 
 // WatchdogAction defines the watchdog action, if a watchdog gets triggered
+// +k8s:openapi-gen=true
 type WatchdogAction string
 
 const (

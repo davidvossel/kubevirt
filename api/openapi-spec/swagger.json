@@ -2494,6 +2494,7 @@
     }
    },
    "v1.EphemeralVolumeSource": {
+    "description": "+k8s:openapi-gen=true",
     "properties": {
      "persistentVolumeClaim": {
       "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace.\nDirectly attached to the vm via qemu.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims\n+optional",
@@ -2502,6 +2503,7 @@
     }
    },
    "v1.FeatureAPIC": {
+    "description": "+k8s:openapi-gen=true",
     "properties": {
      "enabled": {
       "description": "Enabled determines if the feature should be enabled or disabled on the guest\nDefaults to true\n+optional",
@@ -3228,6 +3230,7 @@
     }
    },
    "v1.VMReplicaSetCondition": {
+    "description": "+k8s:openapi-gen=true",
     "required": [
      "type",
      "status"
@@ -3254,6 +3257,7 @@
     }
    },
    "v1.VMReplicaSetSpec": {
+    "description": "+k8s:openapi-gen=true",
     "required": [
      "template"
     ],
@@ -3278,6 +3282,7 @@
     }
    },
    "v1.VMReplicaSetStatus": {
+    "description": "+k8s:openapi-gen=true",
     "properties": {
      "conditions": {
       "type": "array",
@@ -3298,6 +3303,7 @@
     }
    },
    "v1.VMTemplateSpec": {
+    "description": "+k8s:openapi-gen=true",
     "properties": {
      "metadata": {
       "$ref": "#/definitions/v1.ObjectMeta"
@@ -3360,7 +3366,7 @@
     }
    },
    "v1.VirtualMachineList": {
-    "description": "VirtualMachineList is a list of VirtualMachines\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object",
+    "description": "VirtualMachineList is a list of VirtualMachines\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object\n+k8s:openapi-gen=true",
     "required": [
      "items"
     ],
@@ -3385,6 +3391,7 @@
     }
    },
    "v1.VirtualMachineNetworkInterface": {
+    "description": "+k8s:openapi-gen=true",
     "properties": {
      "ipAddress": {
       "description": "IP address of a Virtual Machine interface",
@@ -3397,7 +3404,7 @@
     }
    },
    "v1.VirtualMachinePreset": {
-    "description": "+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object",
+    "description": "+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object\n+k8s:openapi-gen=true",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -3417,7 +3424,7 @@
     }
    },
    "v1.VirtualMachinePresetList": {
-    "description": "VirtualMachinePresetList is a list of VirtualMachinePresets\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object",
+    "description": "VirtualMachinePresetList is a list of VirtualMachinePresets\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object\n+k8s:openapi-gen=true",
     "required": [
      "items"
     ],
@@ -3442,6 +3449,7 @@
     }
    },
    "v1.VirtualMachinePresetSpec": {
+    "description": "+k8s:openapi-gen=true",
     "required": [
      "selector"
     ],
@@ -3457,7 +3465,7 @@
     }
    },
    "v1.VirtualMachineReplicaSet": {
-    "description": "VM is *the* VM Definition. It represents a virtual machine in the runtime environment of kubernetes.\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object",
+    "description": "VM is *the* VM Definition. It represents a virtual machine in the runtime environment of kubernetes.\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object\n+k8s:openapi-gen=true",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -3481,7 +3489,7 @@
     }
    },
    "v1.VirtualMachineReplicaSetList": {
-    "description": "VMList is a list of VMs\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object",
+    "description": "VMList is a list of VMs\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object\n+k8s:openapi-gen=true",
     "required": [
      "items"
     ],

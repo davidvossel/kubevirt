@@ -6,7 +6,7 @@ spec:
   domain:
     resources:
       requests:
-        memory: 64M
+        memory: 64asfa
     devices:
       disks:
       - name: registrydisk
