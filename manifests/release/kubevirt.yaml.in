@@ -5,6 +5,7 @@ metadata:
   name: kubevirt.io:admin
   labels:
     kubevirt.io: ""
+    kubevirt.io/cluster-role: "admin"
 rules:
   - apiGroups:
       - subresources.kubevirt.io
@@ -47,6 +48,7 @@ metadata:
   name: kubevirt.io:edit
   labels:
     kubevirt.io: ""
+    kubevirt.io/cluster-role: "edit"
 rules:
   - apiGroups:
       - subresources.kubevirt.io
@@ -77,6 +79,7 @@ metadata:
   name: kubevirt.io:view
   labels:
     kubevirt.io: ""
+    kubevirt.io/cluster-role: "view"
 rules:
   - apiGroups:
       - kubevirt.io
