@@ -240,6 +240,42 @@ func (app *virtAPIApp) composeSubresources(ctx context.Context) {
 		Operation("test").
 		Doc("Test endpoint verifying apiserver connectivity."))
 
+	subws.Route(subws.GET(rest.ResourcePath(subresourcesvmGVR) + rest.SubResourcePath("testupload")).
+		To(func(request *restful.Request, response *restful.Response) {
+			msg := request.Request
+			mr, err := msg.MultipartReader()
+			if err != nil {
+				log.Log.Reason(err).Error("failed to get multipart reader")
+				response.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			for {
+				p, err := mr.NextPart()
+				if err == io.EOF {
+					log.Log.Infof("done with download!")
+					break
+				}
+				if err != nil {
+					log.Log.Reason(err).Error("failed to get next part of multi part msg")
+					response.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				slurp, err := ioutil.ReadAll(p)
+				if err != nil {
+					log.Log.Reason(err).Error("failed to read next part of multi part msg")
+					response.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				log.Log.Infof("Part %q: %q\n", p.Header.Get("Foo"), slurp)
+			}
+			response.WriteHeader(http.StatusOK)
+
+		}).
+		Param(rest.NamespaceParam(subws)).Param(rest.NameParam(subws)).
+		Operation("testupload").
+		Doc("Test file upload endpoint verifying apiserver connectivity."))
+
 	// Return empty api resource list.
 	// K8s expects to be able to retrieve a resource list for each aggregated
 	// app in order to discover what resources it provides. Without returning
