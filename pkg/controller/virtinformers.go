@@ -133,6 +133,9 @@ type KubeInformerFactory interface {
 
 	// Jobs for dumping operator install strategies
 	OperatorInstallStrategyJob() cache.SharedIndexInformer
+
+	// KubeVirt infrastructure pods
+	OperatorPod() cache.SharedIndexInformer
 }
 
 type kubeInformerFactory struct {
@@ -448,5 +451,18 @@ func (f *kubeInformerFactory) OperatorInstallStrategyJob() cache.SharedIndexInfo
 
 		lw := NewListWatchFromClient(f.clientSet.BatchV1().RESTClient(), "jobs", k8sv1.NamespaceAll, fields.Everything(), labelSelector)
 		return cache.NewSharedIndexInformer(lw, &batchv1.Job{}, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	})
+}
+
+func (f *kubeInformerFactory) OperatorPod() cache.SharedIndexInformer {
+	return f.getInformer("operatorPodsInformer", func() cache.SharedIndexInformer {
+		// Watch all kubevirt infrastructure pods with the operator label
+		labelSelector, err := labels.Parse(OperatorLabel)
+		if err != nil {
+			panic(err)
+		}
+
+		lw := NewListWatchFromClient(f.clientSet.CoreV1().RESTClient(), "pods", k8sv1.NamespaceAll, fields.Everything(), labelSelector)
+		return cache.NewSharedIndexInformer(lw, &k8sv1.Pod{}, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	})
 }
