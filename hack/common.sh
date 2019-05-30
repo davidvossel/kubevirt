@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source cluster-hack/common.sh
+source cluster-up/hack/common.sh
 
 KUBEVIRT_DIR="$(
     cd "$(dirname "$BASH_SOURCE[0]")/../"

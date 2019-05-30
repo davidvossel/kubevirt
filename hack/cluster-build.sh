@@ -26,7 +26,7 @@ set -e
 DOCKER_TAG=${DOCKER_TAG:-devel}
 
 source hack/common.sh
-source cluster/$KUBEVIRT_PROVIDER/provider.sh
+source cluster-up/cluster/$KUBEVIRT_PROVIDER/provider.sh
 source hack/config.sh
 
 echo "Building ..."
