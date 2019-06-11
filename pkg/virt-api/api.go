@@ -545,7 +545,7 @@ func (app *virtAPIApp) validatingWebhooks() []admissionregistrationv1beta1.Webho
 				},
 				Rule: admissionregistrationv1beta1.Rule{
 					APIGroups:   []string{v1.GroupName},
-					APIVersions: []string{v1.VirtualMachineInstanceGroupVersionKind.Version},
+					APIVersions: v1.ApiSupportedWebhookVersions,
 					Resources:   []string{"virtualmachineinstances"},
 				},
 			}},
@@ -567,7 +567,7 @@ func (app *virtAPIApp) validatingWebhooks() []admissionregistrationv1beta1.Webho
 				},
 				Rule: admissionregistrationv1beta1.Rule{
 					APIGroups:   []string{v1.GroupName},
-					APIVersions: []string{v1.VirtualMachineInstanceGroupVersionKind.Version},
+					APIVersions: v1.ApiSupportedWebhookVersions,
 					Resources:   []string{"virtualmachineinstances"},
 				},
 			}},
@@ -590,7 +590,7 @@ func (app *virtAPIApp) validatingWebhooks() []admissionregistrationv1beta1.Webho
 				},
 				Rule: admissionregistrationv1beta1.Rule{
 					APIGroups:   []string{v1.GroupName},
-					APIVersions: []string{v1.VirtualMachineGroupVersionKind.Version},
+					APIVersions: v1.ApiSupportedWebhookVersions,
 					Resources:   []string{"virtualmachines"},
 				},
 			}},
@@ -613,7 +613,7 @@ func (app *virtAPIApp) validatingWebhooks() []admissionregistrationv1beta1.Webho
 				},
 				Rule: admissionregistrationv1beta1.Rule{
 					APIGroups:   []string{v1.GroupName},
-					APIVersions: []string{v1.VirtualMachineInstanceReplicaSetGroupVersionKind.Version},
+					APIVersions: v1.ApiSupportedWebhookVersions,
 					Resources:   []string{"virtualmachineinstancereplicasets"},
 				},
 			}},
@@ -636,7 +636,7 @@ func (app *virtAPIApp) validatingWebhooks() []admissionregistrationv1beta1.Webho
 				},
 				Rule: admissionregistrationv1beta1.Rule{
 					APIGroups:   []string{v1.GroupName},
-					APIVersions: []string{v1.VirtualMachineInstancePresetGroupVersionKind.Version},
+					APIVersions: v1.ApiSupportedWebhookVersions,
 					Resources:   []string{"virtualmachineinstancepresets"},
 				},
 			}},
@@ -658,7 +658,7 @@ func (app *virtAPIApp) validatingWebhooks() []admissionregistrationv1beta1.Webho
 				},
 				Rule: admissionregistrationv1beta1.Rule{
 					APIGroups:   []string{v1.GroupName},
-					APIVersions: []string{v1.VirtualMachineInstanceMigrationGroupVersionKind.Version},
+					APIVersions: v1.ApiSupportedWebhookVersions,
 					Resources:   []string{"virtualmachineinstancemigrations"},
 				},
 			}},
@@ -680,7 +680,7 @@ func (app *virtAPIApp) validatingWebhooks() []admissionregistrationv1beta1.Webho
 				},
 				Rule: admissionregistrationv1beta1.Rule{
 					APIGroups:   []string{v1.GroupName},
-					APIVersions: []string{v1.VirtualMachineInstanceMigrationGroupVersionKind.Version},
+					APIVersions: v1.ApiSupportedWebhookVersions,
 					Resources:   []string{"virtualmachineinstancemigrations"},
 				},
 			}},
@@ -772,7 +772,7 @@ func (app *virtAPIApp) mutatingWebhooks() []admissionregistrationv1beta1.Webhook
 				},
 				Rule: admissionregistrationv1beta1.Rule{
 					APIGroups:   []string{v1.GroupName},
-					APIVersions: []string{v1.VirtualMachineInstanceGroupVersionKind.Version},
+					APIVersions: v1.ApiSupportedWebhookVersions,
 					Resources:   []string{"virtualmachineinstances"},
 				},
 			}},
@@ -793,7 +793,7 @@ func (app *virtAPIApp) mutatingWebhooks() []admissionregistrationv1beta1.Webhook
 				},
 				Rule: admissionregistrationv1beta1.Rule{
 					APIGroups:   []string{v1.GroupName},
-					APIVersions: []string{v1.VirtualMachineInstanceMigrationGroupVersionKind.Version},
+					APIVersions: v1.ApiSupportedWebhookVersions,
 					Resources:   []string{"virtualmachineinstancemigrations"},
 				},
 			}},

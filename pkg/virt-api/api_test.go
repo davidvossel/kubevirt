@@ -343,7 +343,7 @@ var _ = Describe("Virt-api", func() {
 				Return(true, "", nil).
 				AnyTimes()
 			app.Compose()
-			resp, err := http.Get(backend.URL + "/apis/subresources.kubevirt.io/v1alpha3/namespaces/default/virtualmachineinstances/vm1/test")
+			resp, err := http.Get(backend.URL + "/apis/subresources.kubevirt.io/v1/namespaces/default/virtualmachineinstances/vm1/test")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		}, 5)
@@ -355,7 +355,7 @@ var _ = Describe("Virt-api", func() {
 				Return(true, "", nil).
 				AnyTimes()
 			app.Compose()
-			resp, err := http.Get(backend.URL + "/apis/subresources.kubevirt.io/v1alpha3/version")
+			resp, err := http.Get(backend.URL + "/apis/subresources.kubevirt.io/v1/version")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 			// TODO: Check version
@@ -368,7 +368,7 @@ var _ = Describe("Virt-api", func() {
 				Return(true, "", nil).
 				AnyTimes()
 			app.Compose()
-			resp, err := http.Get(backend.URL + "/apis/subresources.kubevirt.io/v1alpha3/")
+			resp, err := http.Get(backend.URL + "/apis/subresources.kubevirt.io/v1/")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 			// TODO: Check list

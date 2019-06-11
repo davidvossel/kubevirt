@@ -48,7 +48,7 @@ var _ = Describe("Kubevirt Version Client", func() {
 
 		groupInfo := metav1.APIGroup{
 			Name:             ApiGroupName,
-			PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: ApiGroupName + "/v1alpha3", Version: "v1alpha3"},
+			PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: ApiGroupName + "/v1", Version: "v1"},
 		}
 
 		info := version.Info{GitVersion: "v0.5.1-alpha.1.43+fda30004223b51-clean",

@@ -17,4 +17,10 @@ spec:
     - vmipresets
     singular: virtualmachineinstancepreset
   scope: Namespaced
-  version: v1alpha3
+  versions:
+  - name: v1
+    served: true
+    storage: false
+  - name: v1alpha3
+    served: true
+    storage: true
