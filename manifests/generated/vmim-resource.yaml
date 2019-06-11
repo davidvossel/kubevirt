@@ -15,4 +15,4 @@ spec:
     - vmims
     singular: virtualmachineinstancemigration
   scope: Namespaced
-  version: v1alpha3
+  version: v1

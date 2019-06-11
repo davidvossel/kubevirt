@@ -52,11 +52,15 @@ const SubresourceGroupName = "subresources.kubevirt.io"
 
 const DefaultGracePeriodSeconds int64 = 30
 
-// GroupVersion is group version used to register these objects
-var GroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha3"}
+var ApiSupportedVersions = []string{"v1", "v1"}
+var ApiStorageVersion = "v1"
+var ApiLatestVersion = "v1"
 
 // GroupVersion is group version used to register these objects
-var SubresourceGroupVersion = schema.GroupVersion{Group: SubresourceGroupName, Version: "v1alpha3"}
+var GroupVersion = schema.GroupVersion{Group: GroupName, Version: ApiLatestVersion}
+
+// GroupVersion is group version used to register these objects
+var SubresourceGroupVersion = schema.GroupVersion{Group: SubresourceGroupName, Version: ApiLatestVersion}
 
 // GroupVersionKind
 var VirtualMachineInstanceGroupVersionKind = schema.GroupVersionKind{Group: GroupName, Version: GroupVersion.Version, Kind: "VirtualMachineInstance"}

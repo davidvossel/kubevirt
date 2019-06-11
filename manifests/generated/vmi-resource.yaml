@@ -28,4 +28,4 @@ spec:
     - vmis
     singular: virtualmachineinstance
   scope: Namespaced
-  version: v1alpha3
+  version: v1
