@@ -25,10 +25,11 @@ DOCKER_TAG_ALT=${DOCKER_TAG_ALT:-devel_alt}
 source hack/common.sh
 source hack/config.sh
 
-_auto_detected_previous_release_tag=$(curl -s https://github.com/kubevirt/kubevirt/releases/latest | grep -o "v[0-9]\.[0-9]*\.[0-9]*")
+_default_previous_release_tag="v0.18.0"
+_default_previous_release_registry="index.docker.io/kubevirt"
 
-previous_release_tag=${PREVIOUS_RELEASE_TAG:-$_auto_detected_previous_release_tag}
-previous_release_registry=${PREVIOUS_RELEASE_REGISTRY:-"index.docker.io/kubevirt"}
+previous_release_tag=${PREVIOUS_RELEASE_TAG:-$_default_previous_release_tag}
+previous_release_registry=${PREVIOUS_RELEASE_REGISTRY:-$default_previous_release_registry}
 
 functest_docker_prefix=${manifest_docker_prefix-${docker_prefix}}
 
