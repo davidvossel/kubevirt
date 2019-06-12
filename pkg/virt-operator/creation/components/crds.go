@@ -83,8 +83,27 @@ func newBlankCrd() *extv1beta1.CustomResourceDefinition {
 	}
 }
 
+func getVersions(printerColumns []extv1beta1.CustomResourceColumnDefinition) {
+
+	var versions []extv1beta1.CustomResourceDefinitionVersion
+
+	for _, version := range virtv1.ApiSupportedVersions {
+		newVersion := version.DeepCopy()
+		newVersion.AdditionalPrinterColumns = printerColumns
+		versions = append(versions, newVersion)
+	}
+	return versions
+}
+
 func NewVirtualMachineInstanceCrd() *extv1beta1.CustomResourceDefinition {
 	crd := newBlankCrd()
+
+	printerColumns := []extv1beta1.CustomResourceColumnDefinition{
+		{Name: "Age", Type: "date", JSONPath: ".metadata.creationTimestamp"},
+		{Name: "Phase", Type: "string", JSONPath: ".status.phase"},
+		{Name: "IP", Type: "string", JSONPath: ".status.interfaces[0].ipAddress"},
+		{Name: "NodeName", Type: "string", JSONPath: ".status.nodeName"},
+	}
 
 	crd.ObjectMeta.Name = "virtualmachineinstances." + virtv1.VirtualMachineInstanceGroupVersionKind.Group
 	crd.Spec = extv1beta1.CustomResourceDefinitionSpec{
@@ -98,12 +117,7 @@ func NewVirtualMachineInstanceCrd() *extv1beta1.CustomResourceDefinition {
 			Kind:       virtv1.VirtualMachineInstanceGroupVersionKind.Kind,
 			ShortNames: []string{"vmi", "vmis"},
 		},
-		AdditionalPrinterColumns: []extv1beta1.CustomResourceColumnDefinition{
-			{Name: "Age", Type: "date", JSONPath: ".metadata.creationTimestamp"},
-			{Name: "Phase", Type: "string", JSONPath: ".status.phase"},
-			{Name: "IP", Type: "string", JSONPath: ".status.interfaces[0].ipAddress"},
-			{Name: "NodeName", Type: "string", JSONPath: ".status.nodeName"},
-		},
+		Versions: getVersions(printerColumns),
 	}
 
 	return crd
@@ -112,11 +126,16 @@ func NewVirtualMachineInstanceCrd() *extv1beta1.CustomResourceDefinition {
 func NewVirtualMachineCrd() *extv1beta1.CustomResourceDefinition {
 	crd := newBlankCrd()
 
+	printerColumns := []extv1beta1.CustomResourceColumnDefinition{
+		{Name: "Age", Type: "date", JSONPath: ".metadata.creationTimestamp"},
+		{Name: "Running", Type: "boolean", JSONPath: ".spec.running"},
+		{Name: "Volume", Description: "Primary Volume", Type: "string", JSONPath: ".spec.volumes[0].name"},
+	}
+
 	crd.ObjectMeta.Name = "virtualmachines." + virtv1.VirtualMachineGroupVersionKind.Group
 	crd.Spec = extv1beta1.CustomResourceDefinitionSpec{
-		Group:   virtv1.VirtualMachineGroupVersionKind.Group,
-		Version: virtv1.VirtualMachineGroupVersionKind.Version,
-		Scope:   "Namespaced",
+		Group: virtv1.VirtualMachineGroupVersionKind.Group,
+		Scope: "Namespaced",
 
 		Names: extv1beta1.CustomResourceDefinitionNames{
 			Plural:     "virtualmachines",
@@ -124,11 +143,7 @@ func NewVirtualMachineCrd() *extv1beta1.CustomResourceDefinition {
 			Kind:       virtv1.VirtualMachineGroupVersionKind.Kind,
 			ShortNames: []string{"vm", "vms"},
 		},
-		AdditionalPrinterColumns: []extv1beta1.CustomResourceColumnDefinition{
-			{Name: "Age", Type: "date", JSONPath: ".metadata.creationTimestamp"},
-			{Name: "Running", Type: "boolean", JSONPath: ".spec.running"},
-			{Name: "Volume", Description: "Primary Volume", Type: "string", JSONPath: ".spec.volumes[0].name"},
-		},
+		Versions: getVersions(printerColumns),
 	}
 
 	return crd
@@ -139,9 +154,8 @@ func NewPresetCrd() *extv1beta1.CustomResourceDefinition {
 
 	crd.ObjectMeta.Name = "virtualmachineinstancepresets." + virtv1.VirtualMachineInstancePresetGroupVersionKind.Group
 	crd.Spec = extv1beta1.CustomResourceDefinitionSpec{
-		Group:   virtv1.VirtualMachineInstancePresetGroupVersionKind.Group,
-		Version: virtv1.VirtualMachineInstancePresetGroupVersionKind.Version,
-		Scope:   "Namespaced",
+		Group: virtv1.VirtualMachineInstancePresetGroupVersionKind.Group,
+		Scope: "Namespaced",
 
 		Names: extv1beta1.CustomResourceDefinitionNames{
 			Plural:     "virtualmachineinstancepresets",
@@ -149,6 +163,7 @@ func NewPresetCrd() *extv1beta1.CustomResourceDefinition {
 			Kind:       virtv1.VirtualMachineInstancePresetGroupVersionKind.Kind,
 			ShortNames: []string{"vmipreset", "vmipresets"},
 		},
+		Versions: getVersions([]extv1beta1.CustomResourceColumnDefinition),
 	}
 
 	return crd
@@ -158,11 +173,19 @@ func NewReplicaSetCrd() *extv1beta1.CustomResourceDefinition {
 	crd := newBlankCrd()
 	labelSelector := ".status.labelSelector"
 
+	printerColumns := []extv1beta1.CustomResourceColumnDefinition{
+		{Name: "Desired", Type: "integer", JSONPath: ".spec.replicas",
+			Description: "Number of desired VirtualMachineInstances"},
+		{Name: "Current", Type: "integer", JSONPath: ".status.replicas",
+			Description: "Number of managed and not final or deleted VirtualMachineInstances"},
+		{Name: "Ready", Type: "integer", JSONPath: ".status.readyReplicas",
+			Description: "Number of managed VirtualMachineInstances which are ready to receive traffic"},
+		{Name: "Age", Type: "date", JSONPath: ".metadata.creationTimestamp"},
+	}
 	crd.ObjectMeta.Name = "virtualmachineinstancereplicasets." + virtv1.VirtualMachineInstanceReplicaSetGroupVersionKind.Group
 	crd.Spec = extv1beta1.CustomResourceDefinitionSpec{
-		Group:   virtv1.VirtualMachineInstanceReplicaSetGroupVersionKind.Group,
-		Version: virtv1.VirtualMachineInstanceReplicaSetGroupVersionKind.Version,
-		Scope:   "Namespaced",
+		Group: virtv1.VirtualMachineInstanceReplicaSetGroupVersionKind.Group,
+		Scope: "Namespaced",
 
 		Names: extv1beta1.CustomResourceDefinitionNames{
 			Plural:     "virtualmachineinstancereplicasets",
@@ -170,15 +193,8 @@ func NewReplicaSetCrd() *extv1beta1.CustomResourceDefinition {
 			Kind:       virtv1.VirtualMachineInstanceReplicaSetGroupVersionKind.Kind,
 			ShortNames: []string{"vmirs", "vmirss"},
 		},
-		AdditionalPrinterColumns: []extv1beta1.CustomResourceColumnDefinition{
-			{Name: "Desired", Type: "integer", JSONPath: ".spec.replicas",
-				Description: "Number of desired VirtualMachineInstances"},
-			{Name: "Current", Type: "integer", JSONPath: ".status.replicas",
-				Description: "Number of managed and not final or deleted VirtualMachineInstances"},
-			{Name: "Ready", Type: "integer", JSONPath: ".status.readyReplicas",
-				Description: "Number of managed VirtualMachineInstances which are ready to receive traffic"},
-			{Name: "Age", Type: "date", JSONPath: ".metadata.creationTimestamp"},
-		},
+		AdditionalPrinterColumns: []extv1beta1.CustomResourceColumnDefinition{},
+		Versions:                 getVersions(printerColumns),
 		Subresources: &extv1beta1.CustomResourceSubresources{
 			Scale: &extv1beta1.CustomResourceSubresourceScale{
 				SpecReplicasPath:   ".spec.replicas",
@@ -196,9 +212,8 @@ func NewVirtualMachineInstanceMigrationCrd() *extv1beta1.CustomResourceDefinitio
 
 	crd.ObjectMeta.Name = "virtualmachineinstancemigrations." + virtv1.VirtualMachineInstanceMigrationGroupVersionKind.Group
 	crd.Spec = extv1beta1.CustomResourceDefinitionSpec{
-		Group:   virtv1.VirtualMachineInstanceMigrationGroupVersionKind.Group,
-		Version: virtv1.VirtualMachineInstanceMigrationGroupVersionKind.Version,
-		Scope:   "Namespaced",
+		Group: virtv1.VirtualMachineInstanceMigrationGroupVersionKind.Group,
+		Scope: "Namespaced",
 
 		Names: extv1beta1.CustomResourceDefinitionNames{
 			Plural:     "virtualmachineinstancemigrations",
@@ -206,6 +221,7 @@ func NewVirtualMachineInstanceMigrationCrd() *extv1beta1.CustomResourceDefinitio
 			Kind:       virtv1.VirtualMachineInstanceMigrationGroupVersionKind.Kind,
 			ShortNames: []string{"vmim", "vmims"},
 		},
+		Versions: getVersions([]extv1beta1.CustomResourceColumnDefinition),
 	}
 
 	return crd
@@ -231,9 +247,8 @@ func NewKubeVirtCrd() *extv1beta1.CustomResourceDefinition {
 
 	crd.ObjectMeta.Name = "kubevirts." + virtv1.KubeVirtGroupVersionKind.Group
 	crd.Spec = extv1beta1.CustomResourceDefinitionSpec{
-		Group:   virtv1.KubeVirtGroupVersionKind.Group,
-		Version: virtv1.KubeVirtGroupVersionKind.Version,
-		Scope:   "Namespaced",
+		Group: virtv1.KubeVirtGroupVersionKind.Group,
+		Scope: "Namespaced",
 
 		Names: extv1beta1.CustomResourceDefinitionNames{
 			Plural:     "kubevirts",
@@ -245,6 +260,7 @@ func NewKubeVirtCrd() *extv1beta1.CustomResourceDefinition {
 			{Name: "Age", Type: "date", JSONPath: ".metadata.creationTimestamp"},
 			{Name: "Phase", Type: "string", JSONPath: ".status.phase"},
 		},
+		Versions: getVersions([]extv1beta1.CustomResourceColumnDefinition),
 	}
 
 	return crd
