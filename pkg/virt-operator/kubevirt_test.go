@@ -984,6 +984,10 @@ var _ = Describe("KubeVirt Operator", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-install",
 					Namespace: NAMESPACE,
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 				Status: v1.KubeVirtStatus{
 					Phase: v1.KubeVirtPhaseDeleted,
@@ -1006,6 +1010,10 @@ var _ = Describe("KubeVirt Operator", func() {
 					Name:       "test-install",
 					Namespace:  NAMESPACE,
 					Finalizers: []string{util.KubeVirtFinalizer},
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 				Spec: v1.KubeVirtSpec{
 					ImageTag: "custom.tag",
@@ -1053,6 +1061,10 @@ var _ = Describe("KubeVirt Operator", func() {
 					Name:       "test-install",
 					Namespace:  NAMESPACE,
 					Finalizers: []string{util.KubeVirtFinalizer},
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 				Status: v1.KubeVirtStatus{
 					Phase: v1.KubeVirtPhaseDeployed,
@@ -1104,6 +1116,10 @@ var _ = Describe("KubeVirt Operator", func() {
 					Name:       "test-install",
 					Namespace:  NAMESPACE,
 					Finalizers: []string{util.KubeVirtFinalizer},
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 				Status: v1.KubeVirtStatus{
 					Phase: v1.KubeVirtPhaseDeployed,
@@ -1149,6 +1165,10 @@ var _ = Describe("KubeVirt Operator", func() {
 					Name:       "test-install",
 					Namespace:  NAMESPACE,
 					Finalizers: []string{util.KubeVirtFinalizer},
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 				Status: v1.KubeVirtStatus{
 					Phase: v1.KubeVirtPhaseDeployed,
@@ -1195,6 +1215,10 @@ var _ = Describe("KubeVirt Operator", func() {
 					Namespace:  NAMESPACE,
 					UID:        "11111111111",
 					Finalizers: []string{util.KubeVirtFinalizer},
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 				Status: v1.KubeVirtStatus{
 					Phase: v1.KubeVirtPhaseDeployed,
@@ -1221,6 +1245,10 @@ var _ = Describe("KubeVirt Operator", func() {
 					Name:      "test-install-2",
 					Namespace: NAMESPACE,
 					UID:       "123123123",
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 				Status: v1.KubeVirtStatus{},
 			}
@@ -1242,8 +1270,12 @@ var _ = Describe("KubeVirt Operator", func() {
 
 			kv := &v1.KubeVirt{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:       "test-install",
-					Namespace:  NAMESPACE,
+					Name:      "test-install",
+					Namespace: NAMESPACE,
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 					Finalizers: []string{util.KubeVirtFinalizer},
 				},
 				Spec: v1.KubeVirtSpec{
@@ -1292,6 +1324,10 @@ var _ = Describe("KubeVirt Operator", func() {
 					Name:       "test-install",
 					Namespace:  NAMESPACE,
 					Finalizers: []string{util.KubeVirtFinalizer},
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 				Status: v1.KubeVirtStatus{},
 			}
@@ -1312,6 +1348,10 @@ var _ = Describe("KubeVirt Operator", func() {
 					Name:       "test-install",
 					Namespace:  NAMESPACE,
 					Finalizers: []string{util.KubeVirtFinalizer},
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 				Status: v1.KubeVirtStatus{},
 			}
@@ -1343,6 +1383,10 @@ var _ = Describe("KubeVirt Operator", func() {
 					Name:       "test-install",
 					Namespace:  NAMESPACE,
 					Finalizers: []string{util.KubeVirtFinalizer},
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 				Status: v1.KubeVirtStatus{},
 			}
@@ -1368,6 +1412,10 @@ var _ = Describe("KubeVirt Operator", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-install",
 					Namespace: NAMESPACE,
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 			}
 			addKubeVirt(kv)
@@ -1421,6 +1469,10 @@ var _ = Describe("KubeVirt Operator", func() {
 					Name:       "test-install",
 					Namespace:  NAMESPACE,
 					Finalizers: []string{util.KubeVirtFinalizer},
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 				Spec: v1.KubeVirtSpec{
 					ImageTag:      rollbackVersion,
@@ -1488,6 +1540,10 @@ var _ = Describe("KubeVirt Operator", func() {
 					Name:       "test-install",
 					Namespace:  NAMESPACE,
 					Finalizers: []string{util.KubeVirtFinalizer},
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 				Spec: v1.KubeVirtSpec{
 					ImageTag:      updatedVersion,
@@ -1556,6 +1612,10 @@ var _ = Describe("KubeVirt Operator", func() {
 					Name:       "test-install",
 					Namespace:  NAMESPACE,
 					Finalizers: []string{util.KubeVirtFinalizer},
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 				Spec: v1.KubeVirtSpec{},
 				Status: v1.KubeVirtStatus{
@@ -1619,8 +1679,12 @@ var _ = Describe("KubeVirt Operator", func() {
 
 			kv := &v1.KubeVirt{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:       "test-install",
-					Namespace:  NAMESPACE,
+					Name:      "test-install",
+					Namespace: NAMESPACE,
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 					Finalizers: []string{util.KubeVirtFinalizer},
 				},
 				Spec: v1.KubeVirtSpec{
@@ -1687,6 +1751,10 @@ var _ = Describe("KubeVirt Operator", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-install",
 					Namespace: NAMESPACE,
+					Annotations: map[string]string{
+						v1.ControllerAPILatestVersionObservedAnnotation:  v1.ApiLatestVersion,
+						v1.ControllerAPIStorageVersionObservedAnnotation: v1.ApiStorageVersion,
+					},
 				},
 			}
 			kv.DeletionTimestamp = now()

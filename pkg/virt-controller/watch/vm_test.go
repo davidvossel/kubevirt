@@ -22,6 +22,7 @@ import (
 	cdifake "kubevirt.io/containerized-data-importer/pkg/client/clientset/versioned/fake"
 	v1 "kubevirt.io/kubevirt/pkg/api/v1"
 	virtv1 "kubevirt.io/kubevirt/pkg/api/v1"
+	"kubevirt.io/kubevirt/pkg/controller"
 	"kubevirt.io/kubevirt/pkg/kubecli"
 	"kubevirt.io/kubevirt/pkg/testutils"
 )
@@ -761,6 +762,8 @@ func DefaultVirtualMachineWithNames(started bool, vmName string, vmiName string)
 		Controller:         &t,
 		BlockOwnerDeletion: &t,
 	}}
+	controller.SetLatestApiVersionAnnotation(vmi)
+	controller.SetLatestApiVersionAnnotation(vm)
 	return vm, vmi
 }
 

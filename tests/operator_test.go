@@ -413,7 +413,7 @@ metadata:
     kubevirt.io/vm: %s
   name: %s
 spec:
-  running: false
+  runStrategy: Manual
   template:
     metadata:
       labels:
@@ -503,7 +503,7 @@ spec:
 		// running a VM/VMI using that previous release
 		// Updating KubeVirt to the target tested code
 		// Ensuring VM/VMI is still operational after the update from previous release.
-		It("from previous release to target tested release", func() {
+		FIt("from previous release to target tested release", func() {
 			previousImageTag := tests.PreviousReleaseTag
 			previousImageRegistry := tests.PreviousReleaseRegistry
 
@@ -542,6 +542,17 @@ spec:
 			allPodsAreReady(previousImageTag)
 			sanityCheckDeploymentsExist()
 
+			// kubectl API discovery cache only refreshes every 10 minutes
+			// Since we're likely dealing with api additions/removals here, we
+			// need to ensure we're using a different cache directory after
+			// the update from the previous release occurs.
+			oldClientCacheDir := workDir + "/oldclient"
+			err = os.MkdirAll(oldClientCacheDir, 0755)
+			Expect(err).ToNot(HaveOccurred())
+			newClientCacheDir := workDir + "/oldclient"
+			err = os.MkdirAll(newClientCacheDir, 0755)
+			Expect(err).ToNot(HaveOccurred())
+
 			// Create VM on previous release using a specific API.
 			// NOTE: we are testing with yaml here and explicilty _NOT_ generating
 			// this vm using the latest api code. We want to guarrantee there are no
@@ -551,7 +562,8 @@ spec:
 			// our api remains upgradable and supportable from previous release.
 			for _, vmYaml := range vmYamls {
 				By(fmt.Sprintf("Creating VM with %s api", vmYaml.vmName))
-				_, _, err = tests.RunCommand(k8sClient, "create", "-f", vmYaml.yamlFile)
+				// kubectl client is needed to interact with older api versions.
+				_, _, err = tests.RunCommand(k8sClient, "create", "-f", vmYaml.yamlFile, "--cache-dir", oldClientCacheDir)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Use Current virtctl to start VM
@@ -561,22 +573,19 @@ spec:
 				startFn := tests.NewRepeatableVirtctlCommand("start", "--namespace", tests.NamespaceTestDefault, vmYaml.vmName)
 				err = startFn()
 				Expect(err).ToNot(HaveOccurred())
-			}
 
-			for _, vmYaml := range vmYamls {
-				By(fmt.Sprintf("Waiting for %s to be ready", vmYaml.vmName))
+				By(fmt.Sprintf("Waiting for VM with %s api to become ready", vmYaml.vmName))
+
 				Eventually(func() bool {
-					virtualMachine, err := virtClient.VirtualMachine(tests.NamespaceTestDefault).Get(vmYaml.vmName, &metav1.GetOptions{})
-					Expect(err).ToNot(HaveOccurred())
-					return virtualMachine.Status.Ready
-				}, 360*time.Second, 1*time.Second).Should(BeTrue())
-
-				By(fmt.Sprintf("Connecting to %s's console", vmYaml.vmName))
-				vmi, err := virtClient.VirtualMachineInstance(tests.NamespaceTestDefault).Get(vmYaml.vmName, &metav1.GetOptions{})
-				Expect(err).ToNot(HaveOccurred())
-				expecter, err := tests.LoggedInCirrosExpecter(vmi)
-				Expect(err).ToNot(HaveOccurred())
-				expecter.Close()
+					// kubectl client is needed to interact with older api versions.
+					output, _, err := tests.RunCommand(k8sClient, "get", "vm", vmYaml.vmName, "-o", "yaml", "--cache-dir", oldClientCacheDir)
+					if err != nil {
+						// errors occur here because kubectl has to re-discover the api versions
+						// after deploying an old apiversion.
+						return false
+					}
+					return strings.Contains(output, "ready: true")
+				}, 90*time.Second, 1*time.Second).Should(BeTrue())
 			}
 
 			// Update KubeVIrt from the previous release to the testing target release.
@@ -594,10 +603,15 @@ spec:
 
 			// Verify console connectivity to VMI
 			for _, vmYaml := range vmYamls {
-				By(fmt.Sprintf("Ensuring %s is still ready", vmYaml.vmName))
-				virtualMachine, err := virtClient.VirtualMachine(tests.NamespaceTestDefault).Get(vmYaml.vmName, &metav1.GetOptions{})
-				Expect(err).ToNot(HaveOccurred())
-				Expect(virtualMachine.Status.Ready).To(Equal(true))
+				By(fmt.Sprintf("Ensuring vm %s is ready", vmYaml.vmName))
+				Eventually(func() bool {
+					// We are using our internal client here on purpose to ensure we can interact
+					// with previously created objects that may have been created using a different
+					// api version from the latest one our client uses.
+					virtualMachine, err := virtClient.VirtualMachine(tests.NamespaceTestDefault).Get(vmYaml.vmName, &metav1.GetOptions{})
+					Expect(err).ToNot(HaveOccurred())
+					return virtualMachine.Status.Ready
+				}, 360*time.Second, 1*time.Second).Should(BeTrue())
 
 				By(fmt.Sprintf("Connecting to %s's console", vmYaml.vmName))
 				vmi, err := virtClient.VirtualMachineInstance(tests.NamespaceTestDefault).Get(vmYaml.vmName, &metav1.GetOptions{})
@@ -608,11 +622,12 @@ spec:
 
 				By("Stopping VM with virtctl")
 				stopFn := tests.NewRepeatableVirtctlCommand("stop", "--namespace", tests.NamespaceTestDefault, vmYaml.vmName)
-				err = stopFn()
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() error {
+					return stopFn()
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 
 				By(fmt.Sprintf("Deleting VM with %s api", vmYaml.vmName))
-				_, _, err = tests.RunCommand(k8sClient, "delete", "-f", vmYaml.yamlFile)
+				_, _, err = tests.RunCommand(k8sClient, "delete", "-f", vmYaml.yamlFile, "--cache-dir", newClientCacheDir)
 				Expect(err).ToNot(HaveOccurred())
 
 			}

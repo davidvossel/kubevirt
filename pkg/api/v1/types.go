@@ -73,7 +73,8 @@ var ApiSupportedVersions = []extv1beta1.CustomResourceDefinitionVersion{
 var GroupVersion = schema.GroupVersion{Group: GroupName, Version: ApiLatestVersion}
 
 // GroupVersion is group version used to register these objects
-var SubresourceGroupVersion = schema.GroupVersion{Group: SubresourceGroupName, Version: ApiLatestVersion}
+// The preferred group version is the first item in the list.
+var SubresourceGroupVersions = []schema.GroupVersion{{Group: SubresourceGroupName, Version: "v1alpha3"}, {Group: SubresourceGroupName, Version: "v1"}}
 
 // GroupVersionKind
 var VirtualMachineInstanceGroupVersionKind = schema.GroupVersionKind{Group: GroupName, Version: GroupVersion.Version, Kind: "VirtualMachineInstance"}
@@ -485,7 +486,9 @@ const (
 	// used to detect virtual machines with dead pods. Used on Pod.
 	DomainAnnotation string = "kubevirt.io/domain"
 	// Represents the name of the migration job this target pod is associated with
-	MigrationJobNameAnnotation string = "kubevirt.io/migrationJobName"
+	MigrationJobNameAnnotation                    string = "kubevirt.io/migrationJobName"
+	ControllerAPILatestVersionObservedAnnotation  string = "kubevirt.io/latest-observed-api-version"
+	ControllerAPIStorageVersionObservedAnnotation string = "kubevirt.io/storage-observed-api-version"
 	// This label is used to match virtual machine instance IDs with pods.
 	// Similar to kubevirt.io/domain. Used on Pod.
 	// Internal use only.
