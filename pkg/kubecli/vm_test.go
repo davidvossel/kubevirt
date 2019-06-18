@@ -20,6 +20,7 @@
 package kubecli
 
 import (
+	"fmt"
 	"net/http"
 
 	. "github.com/onsi/ginkgo"
@@ -30,15 +31,17 @@ import (
 	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+
+	virtv1 "kubevirt.io/kubevirt/pkg/api/v1"
 )
 
 var _ = Describe("Kubevirt VirtualMachine Client", func() {
 
 	var server *ghttp.Server
 	var client KubevirtClient
-	basePath := "/apis/kubevirt.io/v1alpha3/namespaces/default/virtualmachines"
+	basePath := "/apis/kubevirt.io/v1/namespaces/default/virtualmachines"
 	vmiPath := basePath + "/testvm"
-	subBasePath := "/apis/subresources.kubevirt.io/v1alpha3/namespaces/default/virtualmachines"
+	subBasePath := fmt.Sprintf("/apis/subresources.kubevirt.io/%s/namespaces/default/virtualmachines", virtv1.SubresourceGroupVersions[0].Version)
 	subVMIPath := subBasePath + "/testvm"
 
 	BeforeEach(func() {

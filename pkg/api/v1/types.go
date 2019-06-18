@@ -34,6 +34,7 @@ import (
 
 	v1 "k8s.io/api/autoscaling/v1"
 	k8sv1 "k8s.io/api/core/v1"
+	extv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,11 +53,28 @@ const SubresourceGroupName = "subresources.kubevirt.io"
 
 const DefaultGracePeriodSeconds int64 = 30
 
-// GroupVersion is group version used to register these objects
-var GroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha3"}
+var ApiLatestVersion = "v1"
+var ApiSupportedWebhookVersions = []string{"v1alpha3", "v1"}
+var ApiStorageVersion = "v1alpha3"
+var ApiSupportedVersions = []extv1beta1.CustomResourceDefinitionVersion{
+	extv1beta1.CustomResourceDefinitionVersion{
+		Name:    "v1alpha3",
+		Served:  true,
+		Storage: true,
+	},
+	extv1beta1.CustomResourceDefinitionVersion{
+		Name:    "v1",
+		Served:  true,
+		Storage: false,
+	},
+}
 
 // GroupVersion is group version used to register these objects
-var SubresourceGroupVersion = schema.GroupVersion{Group: SubresourceGroupName, Version: "v1alpha3"}
+var GroupVersion = schema.GroupVersion{Group: GroupName, Version: ApiStorageVersion}
+
+// GroupVersion is group version used to register these objects
+// The preferred group version is the first item in the list.
+var SubresourceGroupVersions = []schema.GroupVersion{{Group: SubresourceGroupName, Version: "v1alpha3"}, {Group: SubresourceGroupName, Version: "v1"}}
 
 // GroupVersionKind
 var VirtualMachineInstanceGroupVersionKind = schema.GroupVersionKind{Group: GroupName, Version: GroupVersion.Version, Kind: "VirtualMachineInstance"}
@@ -468,7 +486,9 @@ const (
 	// used to detect virtual machines with dead pods. Used on Pod.
 	DomainAnnotation string = "kubevirt.io/domain"
 	// Represents the name of the migration job this target pod is associated with
-	MigrationJobNameAnnotation string = "kubevirt.io/migrationJobName"
+	MigrationJobNameAnnotation                    string = "kubevirt.io/migrationJobName"
+	ControllerAPILatestVersionObservedAnnotation  string = "kubevirt.io/latest-observed-api-version"
+	ControllerAPIStorageVersionObservedAnnotation string = "kubevirt.io/storage-observed-api-version"
 	// This label is used to match virtual machine instance IDs with pods.
 	// Similar to kubevirt.io/domain. Used on Pod.
 	// Internal use only.

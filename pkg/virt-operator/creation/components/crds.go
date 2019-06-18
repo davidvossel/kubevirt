@@ -88,9 +88,9 @@ func NewVirtualMachineInstanceCrd() *extv1beta1.CustomResourceDefinition {
 
 	crd.ObjectMeta.Name = "virtualmachineinstances." + virtv1.VirtualMachineInstanceGroupVersionKind.Group
 	crd.Spec = extv1beta1.CustomResourceDefinitionSpec{
-		Group:   virtv1.VirtualMachineInstanceGroupVersionKind.Group,
-		Version: virtv1.VirtualMachineInstanceGroupVersionKind.Version,
-		Scope:   "Namespaced",
+		Group:    virtv1.VirtualMachineInstanceGroupVersionKind.Group,
+		Versions: virtv1.ApiSupportedVersions,
+		Scope:    "Namespaced",
 
 		Names: extv1beta1.CustomResourceDefinitionNames{
 			Plural:     "virtualmachineinstances",
@@ -117,9 +117,9 @@ func NewVirtualMachineCrd() *extv1beta1.CustomResourceDefinition {
 
 	crd.ObjectMeta.Name = "virtualmachines." + virtv1.VirtualMachineGroupVersionKind.Group
 	crd.Spec = extv1beta1.CustomResourceDefinitionSpec{
-		Group:   virtv1.VirtualMachineGroupVersionKind.Group,
-		Version: virtv1.VirtualMachineGroupVersionKind.Version,
-		Scope:   "Namespaced",
+		Group:    virtv1.VirtualMachineGroupVersionKind.Group,
+		Versions: virtv1.ApiSupportedVersions,
+		Scope:    "Namespaced",
 
 		Names: extv1beta1.CustomResourceDefinitionNames{
 			Plural:     "virtualmachines",
@@ -145,9 +145,9 @@ func NewPresetCrd() *extv1beta1.CustomResourceDefinition {
 
 	crd.ObjectMeta.Name = "virtualmachineinstancepresets." + virtv1.VirtualMachineInstancePresetGroupVersionKind.Group
 	crd.Spec = extv1beta1.CustomResourceDefinitionSpec{
-		Group:   virtv1.VirtualMachineInstancePresetGroupVersionKind.Group,
-		Version: virtv1.VirtualMachineInstancePresetGroupVersionKind.Version,
-		Scope:   "Namespaced",
+		Group:    virtv1.VirtualMachineInstancePresetGroupVersionKind.Group,
+		Versions: virtv1.ApiSupportedVersions,
+		Scope:    "Namespaced",
 
 		Names: extv1beta1.CustomResourceDefinitionNames{
 			Plural:     "virtualmachineinstancepresets",
@@ -169,9 +169,9 @@ func NewReplicaSetCrd() *extv1beta1.CustomResourceDefinition {
 
 	crd.ObjectMeta.Name = "virtualmachineinstancereplicasets." + virtv1.VirtualMachineInstanceReplicaSetGroupVersionKind.Group
 	crd.Spec = extv1beta1.CustomResourceDefinitionSpec{
-		Group:   virtv1.VirtualMachineInstanceReplicaSetGroupVersionKind.Group,
-		Version: virtv1.VirtualMachineInstanceReplicaSetGroupVersionKind.Version,
-		Scope:   "Namespaced",
+		Group:    virtv1.VirtualMachineInstanceReplicaSetGroupVersionKind.Group,
+		Versions: virtv1.ApiSupportedVersions,
+		Scope:    "Namespaced",
 
 		Names: extv1beta1.CustomResourceDefinitionNames{
 			Plural:     "virtualmachineinstancereplicasets",
@@ -208,9 +208,9 @@ func NewVirtualMachineInstanceMigrationCrd() *extv1beta1.CustomResourceDefinitio
 
 	crd.ObjectMeta.Name = "virtualmachineinstancemigrations." + virtv1.VirtualMachineInstanceMigrationGroupVersionKind.Group
 	crd.Spec = extv1beta1.CustomResourceDefinitionSpec{
-		Group:   virtv1.VirtualMachineInstanceMigrationGroupVersionKind.Group,
-		Version: virtv1.VirtualMachineInstanceMigrationGroupVersionKind.Version,
-		Scope:   "Namespaced",
+		Group:    virtv1.VirtualMachineInstanceMigrationGroupVersionKind.Group,
+		Versions: virtv1.ApiSupportedVersions,
+		Scope:    "Namespaced",
 
 		Names: extv1beta1.CustomResourceDefinitionNames{
 			Plural:     "virtualmachineinstancemigrations",
@@ -246,9 +246,9 @@ func NewKubeVirtCrd() *extv1beta1.CustomResourceDefinition {
 
 	crd.ObjectMeta.Name = "kubevirts." + virtv1.KubeVirtGroupVersionKind.Group
 	crd.Spec = extv1beta1.CustomResourceDefinitionSpec{
-		Group:   virtv1.KubeVirtGroupVersionKind.Group,
-		Version: virtv1.KubeVirtGroupVersionKind.Version,
-		Scope:   "Namespaced",
+		Group:    virtv1.KubeVirtGroupVersionKind.Group,
+		Versions: virtv1.ApiSupportedVersions,
+		Scope:    "Namespaced",
 
 		Names: extv1beta1.CustomResourceDefinitionNames{
 			Plural:     "kubevirts",

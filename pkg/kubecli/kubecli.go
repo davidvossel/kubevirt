@@ -62,7 +62,7 @@ func GetKubevirtSubresourceClientFromFlags(master string, kubeconfig string) (Ku
 		return nil, err
 	}
 
-	config.GroupVersion = &v1.SubresourceGroupVersion
+	config.GroupVersion = &v1.SubresourceGroupVersions[0]
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 	config.APIPath = "/apis"
 	config.ContentType = runtime.ContentTypeJSON
