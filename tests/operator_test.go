@@ -33,6 +33,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	k8sv1 "k8s.io/api/core/v1"
+	extclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -55,8 +56,8 @@ var _ = Describe("Operator", func() {
 
 	k8sClient := tests.GetK8sCmdClient()
 
-	supportedVersions := []string{"v1alpha3"}
 	type vmYamlDefinition struct {
+		apiVersion    string
 		vmName        string
 		generatedYaml string
 		yamlFile      string
@@ -396,29 +397,38 @@ var _ = Describe("Operator", func() {
 
 	})
 
-	BeforeEach(func() {
-		tests.BeforeTestCleanup()
-
-		workDir, err = ioutil.TempDir("", tests.TempDirPrefix+"-")
+	generateVmYamls := func() {
+		ext, err := extclient.NewForConfig(virtClient.Config())
 		Expect(err).ToNot(HaveOccurred())
 
-		vmYamls = []vmYamlDefinition{}
+		crd, err := ext.ApiextensionsV1beta1().CustomResourceDefinitions().Get("virtualmachines.kubevirt.io", metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred())
 
-		// Soon this list will be expanded beyond v1alpha3
-		// which is why the list is structured like this.
+		// Generate a vm Yaml for ever version supported in the currently deployed KubeVirt
+
+		supportedVersions := []string{}
+
+		if len(crd.Spec.Versions) > 0 {
+			for _, version := range crd.Spec.Versions {
+				supportedVersions = append(supportedVersions, version.Name)
+			}
+		} else {
+			supportedVersions = append(supportedVersions, crd.Spec.Version)
+		}
+
 		for _, version := range supportedVersions {
 			vmYaml := fmt.Sprintf(`apiVersion: kubevirt.io/%s
 kind: VirtualMachine
 metadata:
   labels:
-    kubevirt.io/vm: %s
-  name: %s
+    kubevirt.io/vm: vm-%s
+  name: vm-%s
 spec:
   runStrategy: Manual
   template:
     metadata:
       labels:
-        kubevirt.io/vm: %s
+        kubevirt.io/vm: vm-%s
     spec:
       domain:
         devices:
@@ -453,11 +463,22 @@ spec:
 			Expect(err).ToNot(HaveOccurred())
 
 			vmYamls = append(vmYamls, vmYamlDefinition{
-				vmName:        version,
+				apiVersion:    version,
+				vmName:        "vm-" + version,
 				generatedYaml: vmYaml,
 				yamlFile:      yamlFile,
 			})
 		}
+
+	}
+
+	BeforeEach(func() {
+		tests.BeforeTestCleanup()
+
+		workDir, err = ioutil.TempDir("", tests.TempDirPrefix+"-")
+		Expect(err).ToNot(HaveOccurred())
+
+		vmYamls = []vmYamlDefinition{}
 	})
 
 	AfterEach(func() {
@@ -504,7 +525,7 @@ spec:
 		// running a VM/VMI using that previous release
 		// Updating KubeVirt to the target tested code
 		// Ensuring VM/VMI is still operational after the update from previous release.
-		FIt("from previous release to target tested release", func() {
+		It("from previous release to target tested release", func() {
 			previousImageTag := tests.PreviousReleaseTag
 			previousImageRegistry := tests.PreviousReleaseRegistry
 
@@ -560,7 +581,9 @@ spec:
 			// surprises when it comes to backwards compatiblity with previous
 			// virt apis.  As we progress our api from v1alpha3 -> v1 there
 			// needs to be a VM created for every api. This is how we will ensure
-			// our api remains upgradable and supportable from previous release.
+			// our api remains upgradable and supportable from previous releasei.
+
+			generateVmYamls()
 			for _, vmYaml := range vmYamls {
 				By(fmt.Sprintf("Creating VM with %s api", vmYaml.vmName))
 				// NOTE: using kubectl to post yaml directly
@@ -575,7 +598,7 @@ spec:
 				err = startFn()
 				Expect(err).ToNot(HaveOccurred())
 
-				By(fmt.Sprintf("Waiting for VM with %s api to become ready", vmYaml.vmName))
+				By(fmt.Sprintf("Waiting for VM with %s api to become ready", vmYaml.apiVersion))
 
 				Eventually(func() bool {
 					virtualMachine, err := virtClient.VirtualMachine(tests.NamespaceTestDefault).Get(vmYaml.vmName, &metav1.GetOptions{})
@@ -602,7 +625,7 @@ spec:
 
 			// Verify console connectivity to VMI
 			for _, vmYaml := range vmYamls {
-				By(fmt.Sprintf("Ensuring vm %s is ready and latest API annotation is set", vmYaml.vmName))
+				By(fmt.Sprintf("Ensuring vm %s is ready and latest API annotation is set", vmYaml.apiVersion))
 				Eventually(func() bool {
 					// We are using our internal client here on purpose to ensure we can interact
 					// with previously created objects that may have been created using a different
@@ -635,7 +658,7 @@ spec:
 					return stopFn()
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
 
-				By(fmt.Sprintf("Deleting VM with %s api", vmYaml.vmName))
+				By(fmt.Sprintf("Deleting VM with %s api", vmYaml.apiVersion))
 				_, _, err = tests.RunCommand(k8sClient, "delete", "-f", vmYaml.yamlFile, "--cache-dir", newClientCacheDir)
 				Expect(err).ToNot(HaveOccurred())
 			}
