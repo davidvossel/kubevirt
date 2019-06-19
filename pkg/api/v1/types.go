@@ -54,27 +54,37 @@ const SubresourceGroupName = "subresources.kubevirt.io"
 const DefaultGracePeriodSeconds int64 = 30
 
 var ApiLatestVersion = "v1"
-var ApiSupportedWebhookVersions = []string{"v1alpha3", "v1"}
+var ApiSupportedWebhookVersions = []string{"v1", "v1alpha3"}
 var ApiStorageVersion = "v1alpha3"
 var ApiSupportedVersions = []extv1beta1.CustomResourceDefinitionVersion{
-	extv1beta1.CustomResourceDefinitionVersion{
-		Name:    "v1alpha3",
-		Served:  true,
-		Storage: true,
-	},
 	extv1beta1.CustomResourceDefinitionVersion{
 		Name:    "v1",
 		Served:  true,
 		Storage: false,
 	},
+	extv1beta1.CustomResourceDefinitionVersion{
+		Name:    "v1alpha3",
+		Served:  true,
+		Storage: true,
+	},
 }
 
-// GroupVersion is group version used to register these objects
-var GroupVersion = schema.GroupVersion{Group: GroupName, Version: ApiStorageVersion}
+// GroupVersion is the latest group version for the KubeVirt api
+var GroupVersion = schema.GroupVersion{Group: GroupName, Version: ApiLatestVersion}
 
-// GroupVersion is group version used to register these objects
+// StorageGroupVersion is the group version our api is persistented internally as
+var StorageGroupVersion = schema.GroupVersion{Group: GroupName, Version: ApiStorageVersion}
+
+// SubresourceStorageGroupVersion is the group version our api is persistented internally as
+var SubresourceStorageGroupVersion = schema.GroupVersion{Group: SubresourceGroupName, Version: ApiStorageVersion}
+
+// GroupVersions is group version list used to register these objects
 // The preferred group version is the first item in the list.
-var SubresourceGroupVersions = []schema.GroupVersion{{Group: SubresourceGroupName, Version: "v1alpha3"}, {Group: SubresourceGroupName, Version: "v1"}}
+var GroupVersions = []schema.GroupVersion{{Group: GroupName, Version: "v1"}, {Group: GroupName, Version: "v1alpha3"}}
+
+// SubresourceGroupVersions is group version list used to register these objects
+// The preferred group version is the first item in the list.
+var SubresourceGroupVersions = []schema.GroupVersion{{Group: SubresourceGroupName, Version: "v1"}, {Group: SubresourceGroupName, Version: "v1alpha3"}}
 
 // GroupVersionKind
 var VirtualMachineInstanceGroupVersionKind = schema.GroupVersionKind{Group: GroupName, Version: GroupVersion.Version, Kind: "VirtualMachineInstance"}
@@ -91,23 +101,26 @@ var KubeVirtGroupVersionKind = schema.GroupVersionKind{Group: GroupName, Version
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(GroupVersion,
-		&VirtualMachineInstance{},
-		&VirtualMachineInstanceList{},
-		&metav1.ListOptions{},
-		&metav1.DeleteOptions{},
-		&VirtualMachineInstanceReplicaSet{},
-		&VirtualMachineInstanceReplicaSetList{},
-		&VirtualMachineInstancePreset{},
-		&VirtualMachineInstancePresetList{},
-		&VirtualMachineInstanceMigration{},
-		&VirtualMachineInstanceMigrationList{},
-		&metav1.GetOptions{},
-		&VirtualMachine{},
-		&VirtualMachineList{},
-		&KubeVirt{},
-		&KubeVirtList{},
-	)
+
+	for _, groupVersion := range GroupVersions {
+		scheme.AddKnownTypes(groupVersion,
+			&VirtualMachineInstance{},
+			&VirtualMachineInstanceList{},
+			&metav1.ListOptions{},
+			&metav1.DeleteOptions{},
+			&VirtualMachineInstanceReplicaSet{},
+			&VirtualMachineInstanceReplicaSetList{},
+			&VirtualMachineInstancePreset{},
+			&VirtualMachineInstancePresetList{},
+			&VirtualMachineInstanceMigration{},
+			&VirtualMachineInstanceMigrationList{},
+			&metav1.GetOptions{},
+			&VirtualMachine{},
+			&VirtualMachineList{},
+			&KubeVirt{},
+			&KubeVirtList{},
+		)
+	}
 	scheme.AddKnownTypes(metav1.Unversioned,
 		&metav1.Status{},
 	)

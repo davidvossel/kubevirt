@@ -41,7 +41,7 @@ var _ = Describe("Kubevirt VirtualMachineInstance Client", func() {
 	var upgrader websocket.Upgrader
 	var server *ghttp.Server
 	var client KubevirtClient
-	basePath := "/apis/kubevirt.io/v1/namespaces/default/virtualmachineinstances"
+	basePath := "/apis/kubevirt.io/v1alpha3/namespaces/default/virtualmachineinstances"
 	vmiPath := basePath + "/testvm"
 
 	BeforeEach(func() {
