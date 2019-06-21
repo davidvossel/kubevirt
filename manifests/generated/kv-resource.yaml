@@ -24,6 +24,7 @@ spec:
     - kvs
     singular: kubevirt
   scope: Namespaced
+  version: v1
   versions:
   - name: v1
     served: true

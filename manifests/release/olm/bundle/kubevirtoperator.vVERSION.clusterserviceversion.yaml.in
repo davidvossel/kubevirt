@@ -14,7 +14,7 @@ metadata:
     alm-examples: |
       [
         {
-          "apiVersion":"kubevirt.io/v1alpha3",
+          "apiVersion":"kubevirt.io/v1",
           "kind":"KubeVirt",
           "metadata": {
             "name":"kubevirt",
@@ -139,7 +139,7 @@ spec:
   customresourcedefinitions:
     owned:
       - name: kubevirts.kubevirt.io
-        version: v1alpha3
+        version: v1
         kind: KubeVirt
         displayName: KubeVirt deployment
         description: Represents a KubeVirt deployment.

@@ -28,6 +28,7 @@ spec:
     - vms
     singular: virtualmachine
   scope: Namespaced
+  version: v1
   versions:
   - name: v1
     served: true
