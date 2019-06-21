@@ -70,7 +70,7 @@ spec:
           protocol: TCP
         readinessProbe:
           httpGet:
-            path: /apis/subresources.kubevirt.io/v1alpha3/healthz
+            path: /apis/subresources.kubevirt.io/v1/healthz
             port: 8443
             scheme: HTTPS
           initialDelaySeconds: 15

@@ -167,7 +167,7 @@ var _ = Describe("[rfe_id:273][crit:high][vendor:cnv-qe@redhat.com][level:compon
 			Expect(err).To(BeNil(), "Send POST successfully")
 
 			// Add a disk without a volume reference (this is in valid)
-			patchStr := "{\"apiVersion\":\"kubevirt.io/v1alpha3\",\"kind\":\"VirtualMachineInstance\",\"spec\":{\"domain\":{\"devices\":{\"disks\":[{\"disk\":{\"bus\":\"virtio\"},\"name\":\"fakedisk\"}]}}}}"
+			patchStr := "{\"apiVersion\":\"kubevirt.io/v1\",\"kind\":\"VirtualMachineInstance\",\"spec\":{\"domain\":{\"devices\":{\"disks\":[{\"disk\":{\"bus\":\"virtio\"},\"name\":\"fakedisk\"}]}}}}"
 
 			result := virtClient.RestClient().Patch(types.MergePatchType).Resource("virtualmachineinstances").Namespace(tests.NamespaceTestDefault).Name(vmi.Name).Body([]byte(patchStr)).Do()
 

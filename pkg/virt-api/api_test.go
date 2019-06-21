@@ -59,7 +59,7 @@ var _ = Describe("Virt-api", func() {
 	var authorizorMock *rest.MockVirtApiAuthorizor
 	var expectedValidatingWebhooks *admissionregistrationv1beta1.ValidatingWebhookConfiguration
 	var expectedMutatingWebhooks *admissionregistrationv1beta1.MutatingWebhookConfiguration
-	subresourceAggregatedApiName := v1.SubresourceGroupVersion.Version + "." + v1.SubresourceGroupName
+	subresourceAggregatedApiName := v1.SubresourceGroupVersions[0].Version + "." + v1.SubresourceGroupVersions[0].Group
 	log.Log.SetIOWriter(GinkgoWriter)
 
 	BeforeEach(func() {
@@ -264,7 +264,7 @@ var _ = Describe("Virt-api", func() {
 		}, 5)
 
 		It("should create apiservice endpoint if one doesn't exist", func() {
-			expectedApiService := app.subresourceApiservice()
+			expectedApiService := app.subresourceApiservice(v1.SubresourceGroupVersions[0])
 			expectedApiService.Kind = "APIService"
 			expectedApiService.APIVersion = "apiregistration.k8s.io/v1beta1"
 			server.AppendHandlers(
@@ -278,18 +278,18 @@ var _ = Describe("Virt-api", func() {
 					ghttp.RespondWithJSONEncoded(http.StatusOK, nil),
 				),
 			)
-			err := app.createSubresourceApiservice()
+			err := app.createSubresourceApiservice(v1.SubresourceGroupVersions[0])
 			Expect(err).ToNot(HaveOccurred())
 		}, 5)
 
 		It("should update apiservice endpoint if one does exist", func() {
-			expectedApiService := app.subresourceApiservice()
+			expectedApiService := app.subresourceApiservice(v1.SubresourceGroupVersions[0])
 			expectedApiService.Kind = "APIService"
 			expectedApiService.APIVersion = "apiregistration.k8s.io/v1beta1"
 			server.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/apis/apiregistration.k8s.io/v1beta1/apiservices/"+subresourceAggregatedApiName),
-					ghttp.RespondWithJSONEncoded(http.StatusOK, app.subresourceApiservice()),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, app.subresourceApiservice(v1.SubresourceGroupVersions[0])),
 				),
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("PUT", "/apis/apiregistration.k8s.io/v1beta1/apiservices/"+subresourceAggregatedApiName),
@@ -297,7 +297,7 @@ var _ = Describe("Virt-api", func() {
 					ghttp.RespondWithJSONEncoded(http.StatusOK, nil),
 				),
 			)
-			err := app.createSubresourceApiservice()
+			err := app.createSubresourceApiservice(v1.SubresourceGroupVersions[0])
 			Expect(err).ToNot(HaveOccurred())
 		}, 5)
 
@@ -344,7 +344,7 @@ var _ = Describe("Virt-api", func() {
 				Return(true, "", nil).
 				AnyTimes()
 			app.Compose()
-			resp, err := http.Get(backend.URL + "/apis/subresources.kubevirt.io/v1alpha3/namespaces/default/virtualmachineinstances/vm1/test")
+			resp, err := http.Get(backend.URL + "/apis/subresources.kubevirt.io/v1/namespaces/default/virtualmachineinstances/vm1/test")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		}, 5)
@@ -356,7 +356,7 @@ var _ = Describe("Virt-api", func() {
 				Return(true, "", nil).
 				AnyTimes()
 			app.Compose()
-			resp, err := http.Get(backend.URL + "/apis/subresources.kubevirt.io/v1alpha3/version")
+			resp, err := http.Get(backend.URL + "/apis/subresources.kubevirt.io/v1/version")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 			// TODO: Check version
@@ -369,7 +369,7 @@ var _ = Describe("Virt-api", func() {
 				Return(true, "", nil).
 				AnyTimes()
 			app.Compose()
-			resp, err := http.Get(backend.URL + "/apis/subresources.kubevirt.io/v1alpha3/")
+			resp, err := http.Get(backend.URL + "/apis/subresources.kubevirt.io/v1/")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 			// TODO: Check list
