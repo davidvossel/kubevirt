@@ -65,6 +65,8 @@ spec:
           name: virt-private-dir
         - mountPath: /var/lib/kubelet/device-plugins
           name: device-plugin
+        - mountPath: /pods
+          name: kubelet-pods
       hostPID: true
       serviceAccountName: kubevirt-handler
       tolerations:
@@ -86,5 +88,8 @@ spec:
       - hostPath:
           path: /var/lib/kubelet/device-plugins
         name: device-plugin
+      - hostPath:
+          path: /var/lib/kubelet/pods
+        name: kubelet-pods
   updateStrategy:
     type: RollingUpdate
