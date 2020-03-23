@@ -23,13 +23,22 @@ type Mounter struct {
 func (m *Mounter) Mount(vmi *v1.VirtualMachineInstance, verify bool) error {
 	for i, volume := range vmi.Spec.Volumes {
 		if volume.ContainerDisk != nil {
-			targetFile := containerdisk.GenerateDiskTargetPathFromHostView(vmi, i)
+			targetFile, err := containerdisk.GenerateDiskTargetPathFromHostView(vmi, i)
+			if err != nil {
+				return err
+			}
+
 			nodeRes := isolation.NodeIsolationResult()
 
 			if isMounted, err := nodeRes.IsMounted(targetFile); err != nil {
 				return fmt.Errorf("failed to determine if %s is already mounted: %v", targetFile, err)
 			} else if !isMounted {
-				res, err := m.PodIsolationDetector.DetectForSocket(vmi, containerdisk.GenerateSocketPathFromHostView(vmi, i))
+				sock, err := containerdisk.GenerateSocketPathFromHostView(vmi, i)
+				if err != nil {
+					return err
+				}
+
+				res, err := m.PodIsolationDetector.DetectForSocket(vmi, sock)
 				if err != nil {
 					return fmt.Errorf("failed to detect socket for containerDisk %v: %v", volume.Name, err)
 				}
@@ -77,7 +86,13 @@ func (m *Mounter) Mount(vmi *v1.VirtualMachineInstance, verify bool) error {
 
 // Unmount unmounts all container disks of a given VMI.
 func (m *Mounter) Unmount(vmi *v1.VirtualMachineInstance) error {
-	mountDir := containerdisk.GenerateVolumeMountDir(vmi)
+	mountDir, found, err := containerdisk.GenerateVolumeMountDirOnHost(vmi)
+	if err != nil {
+		return err
+	} else if !found {
+		// nothing to do here
+		return nil
+	}
 
 	files, err := ioutil.ReadDir(mountDir)
 	if err != nil && !os.IsNotExist(err) {
