@@ -72,7 +72,7 @@ const (
 
 	defaultControllerThreads = 3
 
-	defaultLauncherSubGid = 107
+	defaultLauncherSubGid = 1000
 )
 
 var (

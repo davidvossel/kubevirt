@@ -313,9 +313,11 @@ func (t *templateService) RenderLaunchManifest(vmi *v1.VirtualMachineInstance) (
 	successThreshold := 1
 	failureThreshold := 5
 
+	nonRoot := true
+	var userId int64 = 1000
+
 	var volumes []k8sv1.Volume
 	var volumeDevices []k8sv1.VolumeDevice
-	var userId int64 = 0
 	var privileged bool = false
 	var volumeMounts []k8sv1.VolumeMount
 	var imagePullSecrets []k8sv1.LocalObjectReference
@@ -791,8 +793,9 @@ func (t *templateService) RenderLaunchManifest(vmi *v1.VirtualMachineInstance) (
 		Image:           t.launcherImage,
 		ImagePullPolicy: imagePullPolicy,
 		SecurityContext: &k8sv1.SecurityContext{
-			RunAsUser:  &userId,
-			Privileged: &privileged,
+			RunAsUser:    &userId,
+			RunAsNonRoot: &nonRoot,
+			Privileged:   &privileged,
 			Capabilities: &k8sv1.Capabilities{
 				Add: capabilities,
 			},
@@ -929,7 +932,8 @@ func (t *templateService) RenderLaunchManifest(vmi *v1.VirtualMachineInstance) (
 			Image:           t.launcherImage,
 			ImagePullPolicy: imagePullPolicy,
 			SecurityContext: &k8sv1.SecurityContext{
-				RunAsUser: &userId,
+				RunAsUser:    &userId,
+				RunAsNonRoot: &nonRoot,
 			},
 			Resources: k8sv1.ResourceRequirements{
 				Limits: map[k8sv1.ResourceName]resource.Quantity{
@@ -1009,9 +1013,14 @@ func (t *templateService) RenderLaunchManifest(vmi *v1.VirtualMachineInstance) (
 			Name:            "container-disk-binary",
 			Image:           t.launcherImage,
 			ImagePullPolicy: imagePullPolicy,
-			Command:         initContainerCommand,
-			VolumeMounts:    initContainerVolumeMounts,
-			Resources:       initContainerResources,
+			SecurityContext: &k8sv1.SecurityContext{
+				RunAsUser:    &userId,
+				RunAsNonRoot: &nonRoot,
+				Privileged:   &privileged,
+			},
+			Command:      initContainerCommand,
+			VolumeMounts: initContainerVolumeMounts,
+			Resources:    initContainerResources,
 		},
 	}
 
@@ -1029,8 +1038,9 @@ func (t *templateService) RenderLaunchManifest(vmi *v1.VirtualMachineInstance) (
 			Hostname:  hostName,
 			Subdomain: vmi.Spec.Subdomain,
 			SecurityContext: &k8sv1.PodSecurityContext{
-				RunAsUser: &userId,
-				FSGroup:   &t.launcherSubGid,
+				RunAsUser:    &userId,
+				RunAsNonRoot: &nonRoot,
+				FSGroup:      &t.launcherSubGid,
 			},
 			TerminationGracePeriodSeconds: &gracePeriodKillAfter,
 			RestartPolicy:                 k8sv1.RestartPolicyNever,

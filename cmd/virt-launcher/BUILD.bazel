@@ -1,4 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 go_library(
     name = "go_default_library",
@@ -45,6 +46,43 @@ load(
     "container_image",
 )
 
+pkg_tar(
+    name = "qemu-allow",
+    srcs = [
+        ":bridge.conf",
+        ":launcher.conf",
+        ":libvirt.conf",
+        ":qemu.conf",
+    ],
+    mode = "640",
+    owner = "0.0",
+    package_dir = "/etc/qemu",
+)
+
+pkg_tar(
+    name = "qemu-kvm-allow",
+    srcs = [
+        ":bridge.conf",
+        ":launcher.conf",
+        ":libvirt.conf",
+        ":qemu.conf",
+    ],
+    mode = "640",
+    owner = "0.0",
+    package_dir = "/etc/qemu-kvm",
+)
+
+pkg_tar(
+    name = "etc-users",
+    srcs = [
+        ":group",
+        ":passwd",
+    ],
+    mode = "644",
+    owner = "0.0",
+    package_dir = "/etc",
+)
+
 container_image(
     name = "version-container",
     base = select({
@@ -53,6 +91,11 @@ container_image(
     }),
     directory = "/",
     files = ["//:get-version"],
+    tars = [
+        ":etc-users",
+        ":qemu-allow",
+        ":qemu-kvm-allow",
+    ],
 )
 
 container_image(
@@ -63,6 +106,9 @@ container_image(
     files = [
         ":virt-launcher",
         "//cmd/container-disk-v2alpha:container-disk",
+    ],
+    tars = [
+        ":etc-users",
     ],
     visibility = ["//visibility:public"],
 )

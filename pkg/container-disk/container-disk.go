@@ -147,6 +147,9 @@ func GetImage(root string, imagePath string) (string, error) {
 func GenerateContainers(vmi *v1.VirtualMachineInstance, podVolumeName string, binVolumeName string) []kubev1.Container {
 	var containers []kubev1.Container
 
+	nonRoot := true
+	var userId int64 = 1000
+
 	initialDelaySeconds := 1
 	timeoutSeconds := 1
 	periodSeconds := 1
@@ -180,8 +183,12 @@ func GenerateContainers(vmi *v1.VirtualMachineInstance, podVolumeName string, bi
 				Name:            diskContainerName,
 				Image:           diskContainerImage,
 				ImagePullPolicy: volume.ContainerDisk.ImagePullPolicy,
-				Command:         []string{"/usr/bin/container-disk"},
-				Args:            []string{"--copy-path", volumeMountDir + "/disk_" + strconv.Itoa(index)},
+				SecurityContext: &kubev1.SecurityContext{
+					RunAsUser:    &userId,
+					RunAsNonRoot: &nonRoot,
+				},
+				Command: []string{"/usr/bin/container-disk"},
+				Args:    []string{"--copy-path", volumeMountDir + "/disk_" + strconv.Itoa(index)},
 				VolumeMounts: []kubev1.VolumeMount{
 					{
 						Name:      podVolumeName,

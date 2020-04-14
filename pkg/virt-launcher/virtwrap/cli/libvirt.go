@@ -36,7 +36,7 @@ import (
 	"kubevirt.io/kubevirt/pkg/virt-launcher/virtwrap/statsconv"
 )
 
-const ConnectionTimeout = 15 * time.Second
+const ConnectionTimeout = 10000 * time.Second
 const ConnectionInterval = 500 * time.Millisecond
 
 // TODO: Should we handle libvirt connection errors transparent or panic?

@@ -12,6 +12,9 @@ spec:
       - disk:
           bus: virtio
         name: containerdisk
+      autoattachPodInterface: false
+      autoattachGraphicsDevice: false
+      autoattachSerialConsole: false
     machine:
       type: ""
     resources:

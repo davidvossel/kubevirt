@@ -28,6 +28,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -1759,7 +1760,12 @@ func (d *VirtualMachineController) processVmUpdate(origVMI *v1.VirtualMachineIns
 	} else {
 
 		if !vmi.IsRunning() && !vmi.IsFinal() {
-			if err := d.containerDiskMounter.Mount(vmi, true); err != nil {
+			res, err := d.podIsolationDetector.Detect(vmi)
+			if err != nil {
+				return err
+			}
+
+			if err = d.containerDiskMounter.Mount(vmi, true); err != nil {
 				return err
 			}
 
@@ -1772,6 +1778,21 @@ func (d *VirtualMachineController) processVmUpdate(origVMI *v1.VirtualMachineIns
 			err = d.podIsolationDetector.AdjustResources(vmi)
 			if err != nil {
 				return fmt.Errorf("failed to adjust resources: %v", err)
+			}
+
+			// the virt-launcher pod has some permission issues that the container itself needs
+			// to have fixed. this logic is just for the PoC
+			out, err := exec.Command("/usr/bin/chroot", "--mount", fmt.Sprintf("/proc/%d/ns/mnt", res.Pid()), "exec", "--", "/usr/bin/chown", "-R", "1000:1000", "/var").CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("failed to set ownership of var directory %v : %v", string(out), err)
+			}
+			//out, err = exec.Command("/usr/bin/chroot", "--mount", fmt.Sprintf("/proc/%d/ns/mnt", res.Pid()), "exec", "--", "/usr/bin/chown", "-R", "1000:1000", "/var/run/kubevirt-ephemeral-disks").CombinedOutput()
+			//if err != nil {
+			//		return fmt.Errorf("failed to set ownership of disk directory %v : %v", string(out), err)
+			//		}
+			out, err = exec.Command("/usr/bin/chroot", "--mount", fmt.Sprintf("/proc/%d/ns/mnt", res.Pid()), "exec", "--", "/usr/bin/chown", "-R", "1000:1000", "/var/run/kubevirt").CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("failed to set ownership of kubevirt directory %v : %v", string(out), err)
 			}
 		}
 

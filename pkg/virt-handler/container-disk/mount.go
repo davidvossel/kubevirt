@@ -236,7 +236,12 @@ func (m *mounter) Mount(vmi *v1.VirtualMachineInstance, verify bool) error {
 				}
 				f.Close()
 
-				out, err := exec.Command("/usr/bin/chroot", "--mount", "/proc/1/ns/mnt", "mount", "-o", "ro,bind", strings.TrimPrefix(sourceFile, nodeRes.MountRoot()), targetFile).CombinedOutput()
+				out, err := exec.Command("/usr/bin/chroot", "--mount", "/proc/1/ns/mnt", "exec", "--", "/usr/bin/chown", "1000:1000", strings.TrimPrefix(sourceFile, nodeRes.MountRoot())).CombinedOutput()
+				if err != nil {
+					return fmt.Errorf("failed to set ownership of containerDisk %v: %v : %v", volume.Name, string(out), err)
+				}
+
+				out, err = exec.Command("/usr/bin/chroot", "--mount", "/proc/1/ns/mnt", "mount", "-o", "ro,bind", strings.TrimPrefix(sourceFile, nodeRes.MountRoot()), targetFile).CombinedOutput()
 				if err != nil {
 					return fmt.Errorf("failed to bindmount containerDisk %v: %v : %v", volume.Name, string(out), err)
 				}

@@ -108,8 +108,8 @@ func startCmdServer(socketPath string,
 }
 
 func createLibvirtConnection() virtcli.Connection {
-	libvirtUri := "qemu:///system"
-	domainConn, err := virtcli.NewConnection(libvirtUri, "", "", 10*time.Second)
+	libvirtUri := "qemu+unix:///session?socket=/usr/bin/.cache/libvirt/libvirt-sock"
+	domainConn, err := virtcli.NewConnection(libvirtUri, "", "", 1000*time.Second)
 	if err != nil {
 		panic(fmt.Sprintf("failed to connect to libvirtd: %v", err))
 	}

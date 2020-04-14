@@ -22,7 +22,7 @@ spec:
         http:
           url: http://cdi-http-import-server.kubevirt/images/alpine.iso
     status: {}
-  running: false
+  running: true
   template:
     metadata:
       labels:
@@ -30,6 +30,9 @@ spec:
     spec:
       domain:
         devices:
+          autoattachPodInterface: false
+          autoattachGraphicsDevice: false
+          autoattachSerialConsole: false
           disks:
           - disk:
               bus: virtio
