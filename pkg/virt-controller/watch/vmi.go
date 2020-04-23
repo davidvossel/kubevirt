@@ -408,7 +408,7 @@ func (c *VMIController) updateStatus(vmi *virtv1.VirtualMachineInstance, pod *k8
 			log.Log.V(3).Object(vmi).Infof("Patching VMI conditions")
 		}
 
-		if !reflect.DeepEqual(vmiCopy.Status.ActivePods, vmi.Status.ActivePods) {
+		if !activePodsEqual(vmiCopy.Status.ActivePods, vmi.Status.ActivePods) {
 			newPods, err := json.Marshal(vmiCopy.Status.ActivePods)
 			if err != nil {
 				return err
@@ -935,6 +935,22 @@ func (c *VMIController) listPodsFromNamespace(namespace string) ([]*k8sv1.Pod, e
 	return pods, nil
 }
 
+func activePodsEqual(a map[types.UID]string, b map[types.UID]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for aKey, aVal := range a {
+		bVal, ok := b[aKey]
+		if !ok {
+			return false
+		} else if aVal != bVal {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (c *VMIController) setActivePods(vmi *virtv1.VirtualMachineInstance) (*virtv1.VirtualMachineInstance, error) {
 	pods, err := c.listPodsFromNamespace(vmi.Namespace)
 	if err != nil {
@@ -956,7 +972,9 @@ func (c *VMIController) setActivePods(vmi *virtv1.VirtualMachineInstance) (*virt
 		return vmi, nil
 	}
 
-	vmi.Status.ActivePods = activePods
+	if !activePodsEqual(vmi.Status.ActivePods, activePods) {
+		vmi.Status.ActivePods = activePods
+	}
 	return vmi, nil
 
 }

@@ -945,6 +945,52 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 			controller.Execute()
 		})
 
+		It("should not patch active pods if pods are equal", func() {
+			vmi := NewPendingVirtualMachine("testvmi")
+			vmi.Status.Phase = v1.Running
+
+			pod1 := NewPodForVirtualMachine(vmi, k8sv1.PodRunning)
+			pod1.UID = "someUID1"
+			pod1.Spec.NodeName = "someHost"
+
+			pod2 := NewPodForVirtualMachine(vmi, k8sv1.PodRunning)
+			pod2.Name = "someothername"
+			pod2.UID = "someUID2"
+			pod2.Spec.NodeName = "someHost"
+
+			vmi.Status.ActivePods = map[types.UID]string{
+				pod2.UID: "someHost",
+				pod1.UID: "someHost",
+			}
+
+			addVirtualMachine(vmi)
+			podFeeder.Add(pod1)
+			podFeeder.Add(pod2)
+
+			//			patch := `[ { "op": "test", "path": "/status/activePods", "value": {} }, { "op": "replace", "path": "/status/activePods", "value": {"someUID":"someHost"} } ]`
+			//			vmiInterface.EXPECT().Patch(vmi.Name, types.JSONPatchType, []byte(patch)).Return(vmi, nil)
+
+			controller.Execute()
+
+			// now reverse order and guarantee that no unexpected PATCH op occurs.
+			vmi.Status.ActivePods = map[types.UID]string{
+				pod2.UID: "someHost",
+				pod1.UID: "someHost",
+			}
+			addVirtualMachine(vmi)
+			controller.Execute()
+
+			// now modify an item and ensure the ActivePods are patched
+			patch := `[ { "op": "test", "path": "/status/activePods", "value": {"madeupuid":"madeuphost","someUID1":"someHost"} }, { "op": "replace", "path": "/status/activePods", "value": {"someUID1":"someHost","someUID2":"someHost"} } ]`
+			vmiInterface.EXPECT().Patch(vmi.Name, types.JSONPatchType, []byte(patch)).Return(vmi, nil)
+			vmi.Status.ActivePods = map[types.UID]string{
+				types.UID("madeupuid"): "madeuphost",
+				pod1.UID:               "someHost",
+			}
+			addVirtualMachine(vmi)
+			controller.Execute()
+		})
+
 		table.DescribeTable("should not add a ready condition if the vmi is", func(phase v1.VirtualMachineInstancePhase) {
 			vmi := NewPendingVirtualMachine("testvmi")
 			vmi.Status.Phase = phase
