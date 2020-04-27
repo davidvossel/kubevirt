@@ -662,7 +662,7 @@ spec:
 		})
 	})
 
-	FDescribe("[rfe_id:2291][crit:high][vendor:cnv-qe@redhat.com][level:component]should update kubevirt", func() {
+	Describe("[rfe_id:2291][crit:high][vendor:cnv-qe@redhat.com][level:component]should update kubevirt", func() {
 
 		// This test is installing a previous release of KubeVirt
 		// running a VM/VMI using that previous release

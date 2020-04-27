@@ -1402,9 +1402,11 @@ var _ = Describe("[rfe_id:1177][crit:medium][vendor:cnv-qe@redhat.com][level:com
 			Expect(strings.HasPrefix(stdErr, "Error from server (AlreadyExists): error when creating")).To(BeTrue(), "command should error when creating VM second time")
 		})
 
-		It("[test_id:299]should create VM via command line", func() {
+		table.DescribeTable("[test_id:299]should create VM via command line using all supported API versions", func(version string) {
 			vmi = tests.NewRandomVMIWithEphemeralDisk(tests.ContainerDiskFor(tests.ContainerDiskAlpine))
 			vm := tests.NewRandomVirtualMachine(vmi, true)
+
+			vm.APIVersion = version
 
 			vmJson, err = tests.GenerateVMJson(vm, workDir)
 			Expect(err).ToNot(HaveOccurred(), "Cannot generate VMs manifest")
@@ -1432,7 +1434,10 @@ var _ = Describe("[rfe_id:1177][crit:medium][vendor:cnv-qe@redhat.com][level:com
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(vmRunningRe.FindString(stdout)).ToNot(Equal(""), "VMI is not Running")
-		})
+		},
+			table.Entry("with v1 api", "kubevirt.io/v1"),
+			table.Entry("with v1alpha3 api", "kubevirt.io/v1alpha3"),
+		)
 
 		It("[test_id:264]should create and delete via command line", func() {
 			vmi = tests.NewRandomVMIWithEphemeralDisk(tests.ContainerDiskFor(tests.ContainerDiskAlpine))
