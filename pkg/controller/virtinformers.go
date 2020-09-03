@@ -57,7 +57,7 @@ import (
 )
 
 const (
-	OperatorLabel = kubev1.ManagedByLabel + "=" + kubev1.ManagedByLabelOperatorValue
+	OperatorLabel = kubev1.ManagedByLabel + " in (" + kubev1.ManagedByLabelOperatorValue + ", " + kubev1.LegacyManagedByLabelOperatorValue + ")"
 )
 
 type newSharedInformer func() cache.SharedIndexInformer
