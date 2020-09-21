@@ -531,7 +531,13 @@ func (c *MigrationController) sync(key string, migration *virtv1.VirtualMachineI
 	case virtv1.MigrationScheduled:
 		// once target pod is scheduled, alert the VMI of the migration by
 		// setting the target and source nodes. This kicks off the preparation stage.
-		if podExists && !podIsDown(pod) {
+		if podExists && isPodReady(pod) {
+
+			err := setVirtLauncherInitializedAnnotation(pod, c.clientset)
+			if err != nil {
+				return err
+			}
+
 			vmiCopy := vmi.DeepCopy()
 			vmiCopy.Status.MigrationState = &virtv1.VirtualMachineInstanceMigrationState{
 				MigrationUID: migration.UID,
@@ -545,7 +551,8 @@ func (c *MigrationController) sync(key string, migration *virtv1.VirtualMachineI
 			vmiCopy.ObjectMeta.Labels[virtv1.MigrationTargetNodeNameLabel] = pod.Spec.NodeName
 
 			if !reflect.DeepEqual(vmi.Status, vmiCopy.Status) ||
-				!reflect.DeepEqual(vmi.Labels, vmiCopy.Labels) {
+				!reflect.DeepEqual(vmi.Labels, vmiCopy.Labels) ||
+				!reflect.DeepEqual(vmi.Annotations, vmiCopy.Annotations) {
 				_, err := c.clientset.VirtualMachineInstance(vmi.Namespace).Update(vmiCopy)
 				if err != nil {
 					c.recorder.Eventf(migration, k8sv1.EventTypeWarning, FailedHandOverPodReason, fmt.Sprintf("Failed to set MigrationStat in VMI status. :%v", err))

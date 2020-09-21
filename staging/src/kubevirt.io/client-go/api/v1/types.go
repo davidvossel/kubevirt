@@ -456,6 +456,8 @@ const (
 	// instance. Needed because with CRDs we can't use field selectors. Used on
 	// VirtualMachineInstance.
 	NodeNameLabel string = "kubevirt.io/nodeName"
+	// This annotation represents that all launcher pod containers have been pulled and started
+	LauncherPodInitialized = "kubevirt.io/launcher-pod-initialized"
 	// This label describes which cluster node runs the target Pod for a Virtual
 	// Machine Instance migration job. Needed because with CRDs we can't use field
 	// selectors. Used on VirtualMachineInstance.

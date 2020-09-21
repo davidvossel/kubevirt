@@ -298,6 +298,34 @@ func conditionsEqual(a []virtv1.VirtualMachineInstanceCondition, b []virtv1.Virt
 	return true
 }
 
+func setVirtLauncherInitializedAnnotation(pod *k8sv1.Pod, clientset kubecli.KubevirtClient) error {
+
+	val, ok := pod.Annotations[virtv1.LauncherPodInitialized]
+	if ok && val == "true" {
+		return nil
+	}
+
+	podCopy := pod.DeepCopy()
+	podCopy.Annotations[virtv1.LauncherPodInitialized] = "true"
+
+	origAnnotationBytes, err := json.Marshal(pod.Annotations)
+	if err != nil {
+		return err
+	}
+	newAnnotationBytes, err := json.Marshal(podCopy.Annotations)
+	if err != nil {
+		return err
+	}
+
+	test := fmt.Sprintf(`{ "op": "test", "path": "/metadata/annotations", "value": %s }`, string(origAnnotationBytes))
+	replace := fmt.Sprintf(`{ "op": "replace", "path": "/metadata/annotations", "value": %s }`, string(newAnnotationBytes))
+
+	patch := fmt.Sprintf("[ %s, %s ]", test, replace)
+	_, err = clientset.CoreV1().Pods(pod.Namespace).Patch(pod.Name, types.JSONPatchType, []byte(patch))
+
+	return err
+}
+
 func (c *VMIController) updateStatus(vmi *virtv1.VirtualMachineInstance, pod *k8sv1.Pod, dataVolumes []*cdiv1.DataVolume, syncErr syncError) error {
 
 	hasFailedDataVolume := false
@@ -374,6 +402,10 @@ func (c *VMIController) updateStatus(vmi *virtv1.VirtualMachineInstance, pod *k8
 					}
 					vmiCopy.ObjectMeta.Labels[virtv1.NodeNameLabel] = pod.Spec.NodeName
 					vmiCopy.Status.NodeName = pod.Spec.NodeName
+					err = setVirtLauncherInitializedAnnotation(pod, c.clientset)
+					if err != nil {
+						return err
+					}
 				}
 			} else if isPodDownOrGoingDown(pod) {
 				vmiCopy.Status.Phase = virtv1.Failed

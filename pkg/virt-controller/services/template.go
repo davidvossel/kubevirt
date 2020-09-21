@@ -715,6 +715,32 @@ func (t *templateService) RenderLaunchManifest(vmi *v1.VirtualMachineInstance) (
 		})
 	}
 
+	volumes = append(volumes, k8sv1.Volume{
+		Name: "annotations",
+		VolumeSource: k8sv1.VolumeSource{
+			Projected: &k8sv1.ProjectedVolumeSource{
+				Sources: []k8sv1.VolumeProjection{
+					{
+						DownwardAPI: &k8sv1.DownwardAPIProjection{
+							Items: []k8sv1.DownwardAPIVolumeFile{
+								{
+									Path: "annotations",
+									FieldRef: &k8sv1.ObjectFieldSelector{
+										FieldPath: "metadata.annotations",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	volumeMounts = append(volumeMounts, k8sv1.VolumeMount{
+		Name:      "annotations",
+		MountPath: filepath.Join(t.virtShareDir, "downward-api"),
+	})
+
 	// Handle CPU pinning
 	if vmi.IsCPUDedicated() {
 		// schedule only on nodes with a running cpu manager
