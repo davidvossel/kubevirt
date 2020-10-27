@@ -2009,6 +2009,9 @@ var CRDsValidation map[string]string = map[string]string{
                         blockMultiQueue:
                           description: Whether or not to enable virtio multi-queue for block devices
                           type: boolean
+                        disableHotplug:
+                          description: DisableHotplug disabled the ability to hotplug disks.
+                          type: boolean
                         disks:
                           description: Disks describes disks, cdroms, floppy and luns which are connected to the vmi.
                           items:
@@ -3578,6 +3581,9 @@ var CRDsValidation map[string]string = map[string]string{
                 blockMultiQueue:
                   description: Whether or not to enable virtio multi-queue for block devices
                   type: boolean
+                disableHotplug:
+                  description: DisableHotplug disabled the ability to hotplug disks.
+                  type: boolean
                 disks:
                   description: Disks describes disks, cdroms, floppy and luns which are connected to the vmi.
                   items:
@@ -4939,6 +4945,9 @@ var CRDsValidation map[string]string = map[string]string{
                 blockMultiQueue:
                   description: Whether or not to enable virtio multi-queue for block devices
                   type: boolean
+                disableHotplug:
+                  description: DisableHotplug disabled the ability to hotplug disks.
+                  type: boolean
                 disks:
                   description: Disks describes disks, cdroms, floppy and luns which are connected to the vmi.
                   items:
@@ -6022,6 +6031,9 @@ var CRDsValidation map[string]string = map[string]string{
                           type: boolean
                         blockMultiQueue:
                           description: Whether or not to enable virtio multi-queue for block devices
+                          type: boolean
+                        disableHotplug:
+                          description: DisableHotplug disabled the ability to hotplug disks.
                           type: boolean
                         disks:
                           description: Disks describes disks, cdroms, floppy and luns which are connected to the vmi.
@@ -8001,6 +8013,9 @@ var CRDsValidation map[string]string = map[string]string{
                                       type: boolean
                                     blockMultiQueue:
                                       description: Whether or not to enable virtio multi-queue for block devices
+                                      type: boolean
+                                    disableHotplug:
+                                      description: DisableHotplug disabled the ability to hotplug disks.
                                       type: boolean
                                     disks:
                                       description: Disks describes disks, cdroms, floppy and luns which are connected to the vmi.
