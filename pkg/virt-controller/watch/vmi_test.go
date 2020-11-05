@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/golang/mock/gomock"
@@ -1240,88 +1241,6 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 			shouldExpectPodDeletion(attachmentPod3)
 		})
 
-		It("CleanupVolumeStatus should not do anything on empty status", func() {
-			vmi := NewPendingVirtualMachine("testvmi")
-			vmi.Status.VolumeStatus = []v1.VolumeStatus{}
-			virtlauncherPod := NewPodForVirtualMachine(vmi, k8sv1.PodRunning)
-			addVirtualMachine(vmi)
-			podFeeder.Add(virtlauncherPod)
-			res := controller.cleanupVolumeStatus(vmi.Status.VolumeStatus, make([]*k8sv1.Pod, 0))
-			Expect(len(res)).To(Equal(0))
-		})
-
-		It("CleanupVolumeStatus should not do anything on empty status, with pod", func() {
-			vmi := NewPendingVirtualMachine("testvmi")
-			vmi.Status.VolumeStatus = []v1.VolumeStatus{}
-			virtlauncherPod := NewPodForVirtualMachine(vmi, k8sv1.PodRunning)
-			attachmentPod1 := NewPodForVirtlauncher(virtlauncherPod, "test-pod", "abcd", k8sv1.PodRunning)
-			addVirtualMachine(vmi)
-			podFeeder.Add(virtlauncherPod)
-			podFeeder.Add(attachmentPod1)
-			attachmentPods := make([]*k8sv1.Pod, 0)
-			attachmentPods = append(attachmentPods, attachmentPod1)
-			res := controller.cleanupVolumeStatus(vmi.Status.VolumeStatus, attachmentPods)
-			Expect(len(res)).To(Equal(0))
-		})
-
-		It("CleanupVolumeStatus should keep volumeStatus unchanged if pod can be found", func() {
-			vmi := NewPendingVirtualMachine("testvmi")
-			vmi.Status.VolumeStatus = []v1.VolumeStatus{
-				{
-					Name: "test-volume",
-					HotplugVolume: &v1.HotplugVolumeStatus{
-						AttachPodName: "test-pod",
-						AttachPodUID:  "abcd",
-						Phase:         v1.HotplugVolumeDetaching,
-					},
-				},
-			}
-			virtlauncherPod := NewPodForVirtualMachine(vmi, k8sv1.PodRunning)
-			attachmentPod1 := NewPodForVirtlauncher(virtlauncherPod, "test-pod", "abcd", k8sv1.PodRunning)
-			addVirtualMachine(vmi)
-			podFeeder.Add(virtlauncherPod)
-			podFeeder.Add(attachmentPod1)
-			attachmentPods := make([]*k8sv1.Pod, 0)
-			attachmentPods = append(attachmentPods, attachmentPod1)
-			res := controller.cleanupVolumeStatus(vmi.Status.VolumeStatus, attachmentPods)
-			Expect(len(res)).To(Equal(1))
-			Expect(res[0].Name).To(Equal("test-volume"))
-			Expect(res[0].HotplugVolume.Phase).To(Equal(v1.HotplugVolumeDetaching))
-		})
-
-		It("CleanupVolumeStatus should remove status without pod", func() {
-			vmi := NewPendingVirtualMachine("testvmi")
-			vmi.Status.VolumeStatus = []v1.VolumeStatus{
-				{
-					Name: "test-volume2",
-					HotplugVolume: &v1.HotplugVolumeStatus{
-						AttachPodName: "test-pod2",
-						AttachPodUID:  "abcde",
-						Phase:         v1.HotplugVolumeDetaching,
-					},
-				},
-				{
-					Name: "test-volume",
-					HotplugVolume: &v1.HotplugVolumeStatus{
-						AttachPodName: "test-pod",
-						AttachPodUID:  "abcd",
-						Phase:         v1.HotplugVolumeDetaching,
-					},
-				},
-			}
-			virtlauncherPod := NewPodForVirtualMachine(vmi, k8sv1.PodRunning)
-			attachmentPod1 := NewPodForVirtlauncher(virtlauncherPod, "test-pod", "abcd", k8sv1.PodRunning)
-			addVirtualMachine(vmi)
-			podFeeder.Add(virtlauncherPod)
-			podFeeder.Add(attachmentPod1)
-			attachmentPods := make([]*k8sv1.Pod, 0)
-			attachmentPods = append(attachmentPods, attachmentPod1)
-			res := controller.cleanupVolumeStatus(vmi.Status.VolumeStatus, attachmentPods)
-			Expect(len(res)).To(Equal(1))
-			Expect(res[0].Name).To(Equal("test-volume"))
-			Expect(res[0].HotplugVolume.Phase).To(Equal(v1.HotplugVolumeDetaching))
-		})
-
 		It("CreateAttachmentPodTemplate should return error if volume is not DV or PVC", func() {
 			vmi := NewPendingVirtualMachine("testvmi")
 			virtlauncherPod := NewPodForVirtualMachine(vmi, k8sv1.PodRunning)
@@ -1333,9 +1252,8 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 					ConfigMap: &v1.ConfigMapVolumeSource{},
 				},
 			}
-			pod, volumeStatus, err := controller.createAttachmentPodTemplate(invalidVolume, virtlauncherPod, vmi, make([]v1.VolumeStatus, 0))
+			pod, err := controller.createAttachmentPodTemplate(invalidVolume, virtlauncherPod, vmi)
 			Expect(pod).To(BeNil())
-			Expect(len(volumeStatus)).To(Equal(0))
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("Unable to hotplug, claim not PVC or Datavolume"))
 		})
@@ -1356,9 +1274,8 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 					},
 				},
 			}
-			pod, volumeStatus, err := controller.createAttachmentPodTemplate(nopvcVolume, virtlauncherPod, vmi, make([]v1.VolumeStatus, 0))
+			pod, err := controller.createAttachmentPodTemplate(nopvcVolume, virtlauncherPod, vmi)
 			Expect(pod).To(BeNil())
-			Expect(len(volumeStatus)).To(Equal(0))
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("Unable to hotplug, claim noclaim not found"))
 		})
@@ -1386,9 +1303,8 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 					},
 				},
 			}
-			pod, volumeStatus, err := controller.createAttachmentPodTemplate(volume, virtlauncherPod, vmi, make([]v1.VolumeStatus, 0))
+			pod, err := controller.createAttachmentPodTemplate(volume, virtlauncherPod, vmi)
 			Expect(pod).To(BeNil())
-			Expect(len(volumeStatus)).To(Equal(0))
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("Unable to find datavolume default/test-dv"))
 		})
@@ -1423,17 +1339,9 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 					},
 				},
 			}
-			pod, volumeStatuses, err := controller.createAttachmentPodTemplate(volume, virtlauncherPod, vmi, make([]v1.VolumeStatus, 0))
+			pod, err := controller.createAttachmentPodTemplate(volume, virtlauncherPod, vmi)
 			Expect(pod).To(BeNil())
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(volumeStatuses)).To(Equal(1))
-			for _, volumeStatus := range volumeStatuses {
-				Expect(volumeStatus.Name).To(Equal(volume.Name))
-				Expect(volumeStatus.HotplugVolume).ToNot(BeNil())
-				Expect(volumeStatus.HotplugVolume.Phase).To(Equal(v1.HotplugVolumePending))
-				Expect(volumeStatus.HotplugVolume.Reason).To(Equal(PVCNotReadyReason))
-				Expect(volumeStatus.HotplugVolume.Message).To(Equal(fmt.Sprintf("PVC %s/%s is not bound and cannot be hotplugged", vmi.Namespace, "test-dv")))
-			}
 		})
 
 		It("CreateAttachmentPodTemplate should update status to bound if DV owning PVC is bound but not ready", func() {
@@ -1474,17 +1382,9 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 					},
 				},
 			}
-			pod, volumeStatuses, err := controller.createAttachmentPodTemplate(volume, virtlauncherPod, vmi, make([]v1.VolumeStatus, 0))
+			pod, err := controller.createAttachmentPodTemplate(volume, virtlauncherPod, vmi)
 			Expect(pod).To(BeNil())
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(volumeStatuses)).To(Equal(1))
-			for _, volumeStatus := range volumeStatuses {
-				Expect(volumeStatus.Name).To(Equal(volume.Name))
-				Expect(volumeStatus.HotplugVolume).ToNot(BeNil())
-				Expect(volumeStatus.HotplugVolume.Phase).To(Equal(v1.HotplugVolumeBound))
-				Expect(volumeStatus.HotplugVolume.Reason).To(Equal(PVCNotReadyReason))
-				Expect(volumeStatus.HotplugVolume.Message).To(Equal(fmt.Sprintf("PVC %s/%s is not fully populated and cannot be hotplugged", vmi.Namespace, "test-dv")))
-			}
 		})
 
 		It("CreateAttachmentPodTemplate should create a pod template if DV of owning PVC is ready", func() {
@@ -1517,17 +1417,14 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 					},
 				},
 			}
-			pod, volumeStatuses, err := controller.createAttachmentPodTemplate(volume, virtlauncherPod, vmi, make([]v1.VolumeStatus, 0))
+			pod, err := controller.createAttachmentPodTemplate(volume, virtlauncherPod, vmi)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(volumeStatuses)).To(Equal(0))
 			Expect(pod.GenerateName).To(Equal("hp-volume-"))
 			Expect(pod.Spec.Volumes[0].Name).To(Equal(volume.Name))
 		})
 
-		makePods := func(indexes ...int) []*k8sv1.Pod {
+		makePodsWithVirtlauncher := func(virtlauncherPod *k8sv1.Pod, indexes ...int) []*k8sv1.Pod {
 			res := make([]*k8sv1.Pod, 0)
-			vmi := NewPendingVirtualMachine("testvmi")
-			virtlauncherPod := NewPodForVirtualMachine(vmi, k8sv1.PodRunning)
 			for _, index := range indexes {
 				pod := NewPodForVirtlauncher(virtlauncherPod, fmt.Sprintf("test-pod%d", index), fmt.Sprintf("abcd%d", index), k8sv1.PodRunning)
 				pod.Spec.Volumes = make([]k8sv1.Volume, 0)
@@ -1542,6 +1439,12 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 				res = append(res, pod)
 			}
 			return res
+		}
+
+		makePods := func(indexes ...int) []*k8sv1.Pod {
+			vmi := NewPendingVirtualMachine("testvmi")
+			virtlauncherPod := NewPodForVirtualMachine(vmi, k8sv1.PodRunning)
+			return makePodsWithVirtlauncher(virtlauncherPod, indexes...)
 		}
 
 		makeVolumes := func(indexes ...int) []*v1.Volume {
@@ -1647,23 +1550,6 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 			}
 		}
 
-		makeExpectedVolumeStatuses := func(indexes ...int) []v1.VolumeStatus {
-			res := makeVolumeStatuses()
-			for _, index := range indexes {
-				res = append(res, v1.VolumeStatus{
-					Name: fmt.Sprintf("volume%d", index),
-					HotplugVolume: &v1.HotplugVolumeStatus{
-						AttachPodName: "", // Since pod is not really created, there is no name
-						AttachPodUID:  "",
-						Phase:         v1.HotplugVolumeAttachedToNode,
-						Message:       fmt.Sprintf("Created hotplug attachment pod , for volume volume%d", index),
-						Reason:        SuccessfulCreatePodReason,
-					},
-				})
-			}
-			return res
-		}
-
 		makeExistingVolumeStatuses := func(indexes ...int) []v1.VolumeStatus {
 			res := makeVolumeStatuses()
 			for _, index := range indexes {
@@ -1730,7 +1616,7 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 			}
 		}
 
-		table.DescribeTable("handleHotplugVolumes should properly react to input", func(hotplugVolumes []*v1.Volume, hotplugAttachmentPods []*k8sv1.Pod, createPodReaction func(*k8sv1.Pod, ...int), pvcFunc func(...int), pvcIndexes []int, orgStatus, expectedStatuses []v1.VolumeStatus, expectedEvent string, expectedErr syncError) {
+		table.DescribeTable("handleHotplugVolumes should properly react to input", func(hotplugVolumes []*v1.Volume, hotplugAttachmentPods []*k8sv1.Pod, createPodReaction func(*k8sv1.Pod, ...int), pvcFunc func(...int), pvcIndexes []int, orgStatus []v1.VolumeStatus, expectedEvent string, expectedErr syncError) {
 			vmi := NewPendingVirtualMachine("testvmi")
 			vmi.Status.VolumeStatus = orgStatus
 			virtlauncherPod := NewPodForVirtualMachine(vmi, k8sv1.PodRunning)
@@ -1740,15 +1626,11 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 			if createPodReaction != nil {
 				createPodReaction(virtlauncherPod, pvcIndexes...)
 			}
-			resStatuses, syncError := controller.handleHotplugVolumes(hotplugVolumes, hotplugAttachmentPods, vmi, virtlauncherPod)
+			syncError := controller.handleHotplugVolumes(hotplugVolumes, hotplugAttachmentPods, vmi, virtlauncherPod)
 			if expectedErr != nil {
 				Expect(syncError).To(BeEquivalentTo(expectedErr))
 			} else {
 				Expect(syncError).ToNot(HaveOccurred())
-				Expect(len(resStatuses)).To(Equal(len(expectedStatuses)))
-				for i, status := range resStatuses {
-					Expect(reflect.DeepEqual(status, expectedStatuses[i])).To(BeTrue(), "status %v does not match %v", status, resStatuses[i])
-				}
 			}
 			if expectedEvent != "" {
 				testutils.ExpectEvent(recorder, expectedEvent)
@@ -1761,7 +1643,6 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 				preparePVC,
 				[]int{},
 				makeVolumeStatuses(),
-				makeVolumeStatuses(),
 				"",
 				nil),
 			table.Entry("when volumes > pods, a new pod should be created with a status",
@@ -1771,7 +1652,6 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 				preparePVC,
 				[]int{2},
 				makeVolumeStatuses(),
-				makeExpectedVolumeStatuses(2),
 				SuccessfulCreatePodReason,
 				nil),
 			table.Entry("when volumes > pods, but an existing status with a pod exist, should error",
@@ -1781,7 +1661,6 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 				preparePVC,
 				[]int{2},
 				makeExistingVolumeStatuses(2),
-				makeExpectedVolumeStatuses(2),
 				"",
 				&syncErrorImpl{fmt.Errorf("Missing pod for hotplugged volume %s", "volume2"), MissingAttachmentPodReason}),
 			table.Entry("when volumes > pods, and creating pod fails, should return the pod creation failure error",
@@ -1791,19 +1670,17 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 				preparePVC,
 				[]int{2},
 				makeVolumeStatuses(),
-				makeExpectedVolumeStatuses(2),
 				FailedCreatePodReason,
-				&syncErrorImpl{fmt.Errorf("Error creating attachment pod /, %v", fmt.Errorf("Error creating pod")), FailedCreatePodReason}),
-			table.Entry("when volumes > pods, should not change status if pod already exists.",
+				&syncErrorImpl{fmt.Errorf("Error creating attachment pod %v", fmt.Errorf("Error creating pod")), FailedCreatePodReason}),
+			table.Entry("when volumes > pods, should return error if pod already exists.",
 				makeVolumes(1, 2),
 				makePods(1),
 				makeExistingCreatePod,
 				preparePVC,
 				[]int{2},
 				makeVolumeStatuses(),
-				makeExpectedVolumeStatuses(),
-				"",
-				nil),
+				FailedCreatePodReason,
+				&syncErrorImpl{fmt.Errorf("Error creating attachment pod %v", fmt.Errorf("pod \"hp-volume\" already exists")), FailedCreatePodReason}),
 			table.Entry("when volumes < pods, the pod should be deleted",
 				makeVolumes(1),
 				makePods(1, 2),
@@ -1811,7 +1688,6 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 				preparePVC,
 				[]int{2},
 				makeVolumeStatuses(),
-				makeExpectedVolumeStatuses(),
 				SuccessfulDeletePodReason,
 				nil),
 			table.Entry("when volumes < pods, if pod deletion fails, it should return the error",
@@ -1821,9 +1697,8 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 				preparePVC,
 				[]int{2},
 				makeVolumeStatuses(),
-				makeExpectedVolumeStatuses(),
-				"",
-				&syncErrorImpl{fmt.Errorf("Error deleting pod default/test-pod2, %v", fmt.Errorf("Error deleting pod")), FailedDeletePodReason}),
+				FailedDeletePodReason,
+				&syncErrorImpl{fmt.Errorf("Error deleting attachment pod %v", fmt.Errorf("Error deleting pod")), FailedDeletePodReason}),
 		)
 
 		table.DescribeTable("needsHandleHotplug", func(hotplugVolumes []*v1.Volume, hotplugAttachmentPods []*k8sv1.Pod, expected bool) {
@@ -1905,6 +1780,93 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 			table.Entry("should return a volume if vmi has one more than virtlauncher", makeK8sVolumes(), makeVolumes(1), 1),
 			table.Entry("should return a volume if vmi has one more than virtlauncher, with matching volumes", makeK8sVolumes(1, 3), makeVolumes(1, 2, 3), 2),
 			table.Entry("should return multiple volumes if vmi has multiple more than virtlauncher, with matching volumes", makeK8sVolumes(1, 3), makeVolumes(1, 2, 3, 4, 5), 2, 4, 5),
+		)
+
+		truncateSprintf := func(str string, args ...interface{}) string {
+			n := strings.Count(str, "%d")
+			return fmt.Sprintf(str, args[:n]...)
+		}
+
+		makeVolumeStatusesForUpdateWithMessage := func(podName, podUID string, phase v1.HotplugVolumePhase, message, reason string, indexes ...int) []v1.VolumeStatus {
+			res := make([]v1.VolumeStatus, 0)
+			for _, index := range indexes {
+				res = append(res, v1.VolumeStatus{
+					Name: fmt.Sprintf("volume%d", index),
+					HotplugVolume: &v1.HotplugVolumeStatus{
+						AttachPodName: truncateSprintf(podName, index),
+						AttachPodUID:  types.UID(truncateSprintf(podUID, index)),
+						Phase:         phase,
+						Message:       truncateSprintf(message, index, index),
+						Reason:        reason,
+					},
+				})
+			}
+			return res
+		}
+
+		makeVolumeStatusesForUpdate := func(indexes ...int) []v1.VolumeStatus {
+			return makeVolumeStatusesForUpdateWithMessage("test-pod%d", "abcd%d", v1.HotplugVolumeAttachedToNode, "Created hotplug attachment pod test-pod%d, for volume volume%d", SuccessfulCreatePodReason, indexes...)
+		}
+
+		table.DescribeTable("updateVolumeStatus", func(oldStatus []v1.VolumeStatus, specVolumes []*v1.Volume, podIndexes []int, pvcIndexes []int, expectedStatus []v1.VolumeStatus) {
+			vmi := NewPendingVirtualMachine("testvmi")
+			volumes := make([]v1.Volume, 0)
+			for _, volume := range specVolumes {
+				volumes = append(volumes, *volume)
+			}
+			vmi.Spec.Volumes = volumes
+			vmi.Status.VolumeStatus = oldStatus
+			virtlauncherPod := NewPodForVirtualMachine(vmi, k8sv1.PodRunning)
+			attachmentPods := makePodsWithVirtlauncher(virtlauncherPod, podIndexes...)
+			now := metav1.Now()
+			for _, pod := range attachmentPods {
+				pod.DeletionTimestamp = &now
+				podInformer.GetIndexer().Add(pod)
+			}
+			for _, pvcIndex := range pvcIndexes {
+				pvc := NewHotplugPVC(fmt.Sprintf("claim%d", pvcIndex), k8sv1.NamespaceDefault, k8sv1.ClaimBound)
+				pvcInformer.GetIndexer().Add(pvc)
+			}
+			err := controller.updateVolumeStatus(vmi, virtlauncherPod)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(reflect.DeepEqual(expectedStatus, vmi.Status.VolumeStatus)).To(BeTrue())
+		},
+			table.Entry("should not update volume status, if no volumes changed",
+				makeVolumeStatusesForUpdate(),
+				makeVolumes(),
+				[]int{},
+				[]int{},
+				makeVolumeStatusesForUpdate()),
+			table.Entry("should update volume status, if a new volume is added, and pod exists",
+				makeVolumeStatusesForUpdate(),
+				makeVolumes(0),
+				[]int{0},
+				[]int{},
+				makeVolumeStatusesForUpdate(0)),
+			table.Entry("should update volume status, if a new volume is added, and pod does not exist",
+				makeVolumeStatusesForUpdate(),
+				makeVolumes(0),
+				[]int{},
+				[]int{0},
+				makeVolumeStatusesForUpdateWithMessage("", "", v1.HotplugVolumeBound, "PVC is in phase Bound", PVCNotReadyReason, 0)),
+			table.Entry("should update volume status, if a existing volume is changed, and pod does not exist",
+				makeVolumeStatusesForUpdateWithMessage("", "", v1.HotplugVolumePending, "PVC is in phase Pending", PVCNotReadyReason, 0),
+				makeVolumes(0),
+				[]int{},
+				[]int{0},
+				makeVolumeStatusesForUpdateWithMessage("", "", v1.HotplugVolumeBound, "PVC is in phase Bound", PVCNotReadyReason, 0)),
+			table.Entry("should keep status, if volume removed and if pod still exists",
+				makeVolumeStatusesForUpdate(0),
+				makeVolumes(),
+				[]int{0},
+				[]int{0},
+				makeVolumeStatusesForUpdateWithMessage("test-pod0", "abcd0", v1.HotplugVolumeDetaching, "Deleted hotplug attachment pod test-pod0, for volume volume0", SuccessfulDeletePodReason, 0)),
+			table.Entry("should remove volume status, if volume is removed and pod is gone",
+				makeVolumeStatusesForUpdate(0),
+				makeVolumes(),
+				[]int{},
+				[]int{},
+				makeVolumeStatusesForUpdate()),
 		)
 	})
 })
