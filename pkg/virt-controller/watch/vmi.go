@@ -1423,7 +1423,7 @@ func (c *VMIController) updateVolumeStatus(vmi *virtv1.VirtualMachineInstance, v
 }
 
 func (c *VMIController) canMoveToAttachedPhase(currentPhase virtv1.HotplugVolumePhase) bool {
-	return currentPhase == virtv1.HotplugVolumeBound || currentPhase == virtv1.HotplugVolumePending ||
+	return currentPhase == "" || currentPhase == virtv1.HotplugVolumeBound || currentPhase == virtv1.HotplugVolumePending ||
 		currentPhase == virtv1.HotplugVolumeAttachedToNode
 }
 

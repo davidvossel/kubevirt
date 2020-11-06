@@ -171,7 +171,7 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 		config, _, _, _ := testutils.NewFakeClusterConfig(&k8sv1.ConfigMap{})
 		pvcInformer, _ = testutils.NewFakeInformerFor(&k8sv1.PersistentVolumeClaim{})
 		controller = NewVMIController(
-			services.NewTemplateService("a", "b", "c", "d", "e", "f", pvcInformer.GetStore(), virtClient, config, qemuGid),
+			services.NewTemplateService("a", "b", "c", "d", "e", "f", "g", pvcInformer.GetStore(), virtClient, config, qemuGid),
 			vmiInformer,
 			podInformer,
 			pvcInformer,
@@ -1347,12 +1347,11 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 		It("CreateAttachmentPodTemplate should update status to bound if DV owning PVC is bound but not ready", func() {
 			vmi := NewPendingVirtualMachine("testvmi")
 			vmi.Status.VolumeStatus = append(vmi.Status.VolumeStatus, v1.VolumeStatus{
-				Name: "test-pvc-volume",
-				HotplugVolume: &v1.HotplugVolumeStatus{
-					Phase:   v1.HotplugVolumePending,
-					Message: "some technical reason",
-					Reason:  PVCNotReadyReason,
-				},
+				Name:          "test-pvc-volume",
+				HotplugVolume: &v1.HotplugVolumeStatus{},
+				Phase:         v1.HotplugVolumePending,
+				Message:       "some technical reason",
+				Reason:        PVCNotReadyReason,
 			})
 			virtlauncherPod := NewPodForVirtualMachine(vmi, k8sv1.PodRunning)
 			pvc := NewHotplugPVC("test-dv", vmi.Namespace, k8sv1.ClaimBound)
@@ -1558,10 +1557,10 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 					HotplugVolume: &v1.HotplugVolumeStatus{
 						AttachPodName: "testing-pod",
 						AttachPodUID:  "abcd",
-						Phase:         v1.HotplugVolumeAttachedToNode,
-						Message:       fmt.Sprintf("Created hotplug attachment pod , for volume volume%d", index),
-						Reason:        SuccessfulCreatePodReason,
 					},
+					Phase:   v1.HotplugVolumeAttachedToNode,
+					Message: fmt.Sprintf("Created hotplug attachment pod , for volume volume%d", index),
+					Reason:  SuccessfulCreatePodReason,
 				})
 			}
 			return res
@@ -1795,10 +1794,10 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 					HotplugVolume: &v1.HotplugVolumeStatus{
 						AttachPodName: truncateSprintf(podName, index),
 						AttachPodUID:  types.UID(truncateSprintf(podUID, index)),
-						Phase:         phase,
-						Message:       truncateSprintf(message, index, index),
-						Reason:        reason,
 					},
+					Phase:   phase,
+					Message: truncateSprintf(message, index, index),
+					Reason:  reason,
 				})
 			}
 			return res

@@ -96,6 +96,7 @@ type templateService struct {
 	virtLibDir                 string
 	ephemeralDiskDir           string
 	containerDiskDir           string
+	hotplugDiskDir             string
 	imagePullSecret            string
 	persistentVolumeClaimStore cache.Store
 	virtClient                 kubecli.KubevirtClient
@@ -340,6 +341,13 @@ func (t *templateService) RenderLaunchManifest(vmi *v1.VirtualMachineInstance) (
 		MountPath:        t.containerDiskDir,
 		MountPropagation: &prop,
 	})
+	if !vmi.Spec.Domain.Devices.DisableHotplug {
+		volumeMounts = append(volumeMounts, k8sv1.VolumeMount{
+			Name:             "hotplug-disks",
+			MountPath:        t.hotplugDiskDir,
+			MountPropagation: &prop,
+		})
+	}
 
 	volumeMounts = append(volumeMounts, k8sv1.VolumeMount{
 		Name:      "libvirt-runtime",
@@ -919,6 +927,14 @@ func (t *templateService) RenderLaunchManifest(vmi *v1.VirtualMachineInstance) (
 			EmptyDir: &k8sv1.EmptyDirVolumeSource{},
 		},
 	})
+	if !vmi.Spec.Domain.Devices.DisableHotplug {
+		volumes = append(volumes, k8sv1.Volume{
+			Name: "hotplug-disks",
+			VolumeSource: k8sv1.VolumeSource{
+				EmptyDir: &k8sv1.EmptyDirVolumeSource{},
+			},
+		})
+	}
 
 	for k, v := range vmi.Spec.NodeSelector {
 		nodeSelector[k] = v
@@ -1484,6 +1500,7 @@ func NewTemplateService(launcherImage string,
 	virtLibDir string,
 	ephemeralDiskDir string,
 	containerDiskDir string,
+	hotplugDiskDir string,
 	imagePullSecret string,
 	persistentVolumeClaimCache cache.Store,
 	virtClient kubecli.KubevirtClient,
@@ -1497,6 +1514,7 @@ func NewTemplateService(launcherImage string,
 		virtLibDir:                 virtLibDir,
 		ephemeralDiskDir:           ephemeralDiskDir,
 		containerDiskDir:           containerDiskDir,
+		hotplugDiskDir:             hotplugDiskDir,
 		imagePullSecret:            imagePullSecret,
 		persistentVolumeClaimStore: persistentVolumeClaimCache,
 		virtClient:                 virtClient,

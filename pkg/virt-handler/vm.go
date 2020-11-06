@@ -47,6 +47,7 @@ import (
 
 	container_disk "kubevirt.io/kubevirt/pkg/virt-handler/container-disk"
 	device_manager "kubevirt.io/kubevirt/pkg/virt-handler/device-manager"
+	hotplug_volume "kubevirt.io/kubevirt/pkg/virt-handler/hotplug-disk"
 
 	v1 "kubevirt.io/client-go/api/v1"
 	"kubevirt.io/client-go/kubecli"
@@ -113,6 +114,7 @@ func NewController(
 		migrationProxy:           migrationproxy.NewMigrationProxyManager(serverTLSConfig, clientTLSConfig),
 		podIsolationDetector:     podIsolationDetector,
 		containerDiskMounter:     container_disk.NewMounter(podIsolationDetector, virtPrivateDir+"/container-disk-mount-state"),
+		hotplugVolumeMounter:     hotplug_volume.NewVolumeMounter(virtPrivateDir + "/hotplug-volume-mount-state"),
 		clusterConfig:            clusterConfig,
 	}
 
@@ -171,6 +173,7 @@ type VirtualMachineController struct {
 	migrationProxy           migrationproxy.ProxyManager
 	podIsolationDetector     isolation.PodIsolationDetector
 	containerDiskMounter     container_disk.Mounter
+	hotplugVolumeMounter     hotplug_volume.VolumeMounter
 	clusterConfig            *virtconfig.ClusterConfig
 
 	// records if pod network phase1 has completed
@@ -2015,7 +2018,10 @@ func (d *VirtualMachineController) processVmUpdate(origVMI *v1.VirtualMachineIns
 			d.recorder.Event(vmi, k8sv1.EventTypeNormal, v1.Migrating.String(), "VirtualMachineInstance is migrating.")
 		}
 	} else {
-
+		// Umount any disks no longer mounted
+		if err := d.hotplugVolumeMounter.Unmount(vmi); err != nil {
+			return err
+		}
 		if !vmi.IsRunning() && !vmi.IsFinal() {
 
 			// give containerDisks some time to become ready before throwing errors on retries
@@ -2046,6 +2052,10 @@ func (d *VirtualMachineController) processVmUpdate(origVMI *v1.VirtualMachineIns
 			err = d.podIsolationDetector.AdjustResources(vmi)
 			if err != nil {
 				return fmt.Errorf("failed to adjust resources: %v", err)
+			}
+		} else if vmi.IsRunning() && !vmi.IsFinal() {
+			if err := d.hotplugVolumeMounter.Mount(vmi); err != nil {
+				return err
 			}
 		}
 
