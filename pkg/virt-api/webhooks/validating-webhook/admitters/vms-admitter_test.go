@@ -136,6 +136,109 @@ var _ = Describe("Validating VM Admitter", func() {
 		Expect(resp.Allowed).To(BeTrue())
 	})
 
+	table.DescribeTable("should validate VolumeRequest", func(requests []v1.VirtualMachineVolumeRequest, isValid bool) {
+		vmi := v1.NewMinimalVMI("testvmi")
+		vmi.Spec.Domain.Devices.Disks = append(vmi.Spec.Domain.Devices.Disks, v1.Disk{
+			Name: "testdisk",
+		})
+		vmi.Spec.Volumes = append(vmi.Spec.Volumes, v1.Volume{
+			Name: "testdisk",
+			VolumeSource: v1.VolumeSource{
+				ContainerDisk: &v1.ContainerDiskSource{},
+			},
+		})
+
+		vm := &v1.VirtualMachine{
+			Spec: v1.VirtualMachineSpec{
+				Running: &notRunning,
+				Template: &v1.VirtualMachineInstanceTemplateSpec{
+					Spec: vmi.Spec,
+				},
+			},
+			Status: v1.VirtualMachineStatus{
+				VolumeRequests: requests,
+			},
+		}
+		vmBytes, _ := json.Marshal(&vm)
+
+		ar := &v1beta1.AdmissionReview{
+			Request: &v1beta1.AdmissionRequest{
+				Resource: webhooks.VirtualMachineGroupVersionResource,
+				Object: runtime.RawExtension{
+					Raw: vmBytes,
+				},
+			},
+		}
+
+		resp := vmsAdmitter.Admit(ar)
+		Expect(resp.Allowed).To(Equal(isValid))
+	},
+		table.Entry("with valid request to add volume", []v1.VirtualMachineVolumeRequest{
+			{
+				AddVolumeOptions: &v1.AddVolumeOptions{
+					Name: "testdisk2",
+					Disk: &v1.Disk{
+						Name: "testdisk2",
+					},
+					VolumeSource: &v1.HotplugVolumeSource{
+						PersistentVolumeClaim: &k8sv1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "madeup",
+						},
+					},
+				},
+			},
+		},
+			true),
+		table.Entry("with invalid request to add volume that already exists", []v1.VirtualMachineVolumeRequest{
+			{
+				AddVolumeOptions: &v1.AddVolumeOptions{
+					Name: "testdisk",
+					Disk: &v1.Disk{
+						Name: "testdisk",
+					},
+					VolumeSource: &v1.HotplugVolumeSource{
+						PersistentVolumeClaim: &k8sv1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "madeup",
+						},
+					},
+				},
+			},
+		},
+			false),
+
+		table.Entry("with valid request to remove volume", []v1.VirtualMachineVolumeRequest{
+			{
+				RemoveVolumeOptions: &v1.RemoveVolumeOptions{
+					Name: "testdisk",
+				},
+			},
+		},
+			true),
+		table.Entry("with invalid request with no options", []v1.VirtualMachineVolumeRequest{
+			{},
+		},
+			false),
+		table.Entry("with invalid request with multiple options", []v1.VirtualMachineVolumeRequest{
+			{
+				AddVolumeOptions: &v1.AddVolumeOptions{
+					Name: "testdisk2",
+					Disk: &v1.Disk{
+						Name: "testdisk2",
+					},
+					VolumeSource: &v1.HotplugVolumeSource{
+						PersistentVolumeClaim: &k8sv1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "madeup",
+						},
+					},
+				},
+				RemoveVolumeOptions: &v1.RemoveVolumeOptions{
+					Name: "testdisk",
+				},
+			},
+		},
+			false),
+	)
+
 	It("should accept valid DataVolumeTemplate", func() {
 		vmi := v1.NewMinimalVMI("testvmi")
 		vmi.Spec.Domain.Devices.Disks = append(vmi.Spec.Domain.Devices.Disks, v1.Disk{
