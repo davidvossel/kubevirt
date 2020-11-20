@@ -1162,6 +1162,7 @@ func (t *templateService) RenderLaunchManifest(vmi *v1.VirtualMachineInstance) (
 }
 
 func (t *templateService) RenderHotplugAttachmentPodTemplate(volume *v1.Volume, ownerPod *k8sv1.Pod, vmi *v1.VirtualMachineInstance, pvcName string, isBlock bool) (*k8sv1.Pod, error) {
+	zero := int64(0)
 	pod := &k8sv1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "hp-volume-",
@@ -1229,7 +1230,8 @@ func (t *templateService) RenderHotplugAttachmentPodTemplate(volume *v1.Volume, 
 					},
 				},
 			},
-			HostNetwork: true,
+			HostNetwork:                   true,
+			TerminationGracePeriodSeconds: &zero,
 		},
 	}
 
