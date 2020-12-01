@@ -18781,6 +18781,13 @@ func schema_kubevirtio_client_go_api_v1_VirtualMachineInstanceStatus(ref common.
 							},
 						},
 					},
+					"currentLauncherImage": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CurrentLauncherImage contains the launcher container image that is currently active for this vmi",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
