@@ -1828,6 +1828,11 @@ func (in *KubeVirtStatus) DeepCopyInto(out *KubeVirtStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.OutdatedVMIWorkloads != nil {
+		in, out := &in.OutdatedVMIWorkloads, &out.OutdatedVMIWorkloads
+		*out = new(int)
+		**out = **in
+	}
 	return
 }
 

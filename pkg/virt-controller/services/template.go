@@ -94,6 +94,7 @@ type TemplateService interface {
 	RenderLaunchManifest(*v1.VirtualMachineInstance) (*k8sv1.Pod, error)
 	RenderHotplugAttachmentPodTemplate(volume *v1.Volume, ownerPod *k8sv1.Pod, vmi *v1.VirtualMachineInstance, pvcName string, isBlock bool) (*k8sv1.Pod, error)
 	RenderLaunchManifestNoVm(*v1.VirtualMachineInstance) (*k8sv1.Pod, error)
+	GetLauncherImage() string
 }
 
 type templateService struct {
@@ -312,6 +313,11 @@ func requestResource(resources *k8sv1.ResourceRequirements, resourceName string)
 		resources.Requests[name] = unitQuantity
 	}
 }
+
+func (t *templateService) GetLauncherImage() string {
+	return t.launcherImage
+}
+
 func (t *templateService) RenderLaunchManifestNoVm(vmi *v1.VirtualMachineInstance) (*k8sv1.Pod, error) {
 	return t.renderLaunchManifest(vmi, true)
 }
