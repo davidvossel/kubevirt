@@ -536,6 +536,8 @@ func (c *VMIController) updateStatus(vmi *virtv1.VirtualMachineInstance, pod *k8
 		}
 
 		if vmiPodExists {
+			var foundImage string
+
 			for _, container := range pod.Spec.Containers {
 				if container.Name == "compute" && container.Image != vmi.Status.CurrentLauncherImage {
 					verb := "add"
@@ -545,6 +547,36 @@ func (c *VMIController) updateStatus(vmi *virtv1.VirtualMachineInstance, pod *k8
 					}
 					patchOps = append(patchOps, fmt.Sprintf(`{ "op": "%s", "path": "/status/currentLauncherImage", "value": "%s" }`, verb, container.Image))
 					break
+				}
+			}
+
+			if foundImage != "" && foundImage != c.templateService.GetLauncherImage() {
+				if vmiCopy.Labels == nil {
+					vmiCopy.Labels = map[string]string{}
+				}
+				vmiCopy.Labels[virtv1.OutdatedLauncherImageLabel] = ""
+			} else {
+				if vmiCopy.Labels != nil {
+					delete(vmiCopy.Labels, virtv1.OutdatedLauncherImageLabel)
+				}
+			}
+
+			if !reflect.DeepEqual(vmi.Labels, vmiCopy.Labels) {
+				labelBytes, err := json.Marshal(vmiCopy.Labels)
+				if err != nil {
+					return err
+				}
+				origLabelBytes, err := json.Marshal(vmi.Labels)
+				if err != nil {
+					return err
+				}
+
+				if vmi.Labels == nil {
+					patchOps = append(patchOps, fmt.Sprintf(`{ "op": "add", "path": "/metadata/labels", "value": %s }`, string(labelBytes)))
+				} else {
+					patchOps = append(patchOps, fmt.Sprintf(`{ "op": "test", "path": "/metadata/labels", "value": %s }`, string(origLabelBytes)))
+					patchOps = append(patchOps, fmt.Sprintf(`{ "op": "replace", "path": "/metadata/labels", "value": %s }`, string(labelBytes)))
+
 				}
 			}
 		}

@@ -40,7 +40,7 @@ const (
 const reEnqueueIntervalSeconds = 30
 
 // ensures we don't execute more than once every 5 seconds
-const throttleIntervalSeconds = 5
+const defaultThrottleIntervalSeconds = 5
 
 const defaultBatchDeletionIntervalSeconds = 60
 const defaultBatchDeletionCount = 10
@@ -55,6 +55,8 @@ type WorkloadUpdateController struct {
 	kubeVirtInformer      cache.SharedIndexInformer
 	clusterConfig         *virtconfig.ClusterConfig
 	launcherImage         string
+
+	throttleIntervalSeconds int
 
 	// This lock protects cached data within this struct
 	// that is dynamic. The lock is held for the duration
@@ -88,7 +90,6 @@ func NewWorkloadUpdateController(
 	recorder record.EventRecorder,
 	clientset kubecli.KubevirtClient,
 	clusterConfig *virtconfig.ClusterConfig,
-	launcherImage string,
 ) *WorkloadUpdateController {
 
 	c := &WorkloadUpdateController{
@@ -100,7 +101,8 @@ func NewWorkloadUpdateController(
 		clientset:             clientset,
 		migrationExpectations: controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
 		clusterConfig:         clusterConfig,
-		launcherImage:         launcherImage,
+
+		throttleIntervalSeconds: defaultThrottleIntervalSeconds,
 
 		reconcileThrottleMap: make(map[string]time.Time),
 	}
@@ -326,6 +328,7 @@ func (c *WorkloadUpdateController) getUpdateData(kv *virtv1.KubeVirt) *updateDat
 			data.shutdownOutdatedVMIs = append(data.shutdownOutdatedVMIs, vmi)
 		}
 	}
+
 	return data
 }
 
@@ -355,9 +358,9 @@ func (c *WorkloadUpdateController) execute(key string) error {
 
 	ts, ok := c.reconcileThrottleMap[key]
 	if !ok {
-		c.reconcileThrottleMap[key] = now.Add(time.Duration(throttleIntervalSeconds) * time.Second)
+		c.reconcileThrottleMap[key] = now.Add(time.Duration(c.throttleIntervalSeconds) * time.Second)
 	} else if now.Before(ts) {
-		c.queue.AddAfter(key, time.Duration(throttleIntervalSeconds)*time.Second)
+		c.queue.AddAfter(key, time.Duration(c.throttleIntervalSeconds)*time.Second)
 		return nil
 	}
 
@@ -372,12 +375,12 @@ func (c *WorkloadUpdateController) execute(key string) error {
 		return nil
 	}
 
-	data := c.getUpdateData(kv)
-
-	return c.sync(kv, data)
+	return c.sync(kv)
 }
 
-func (c *WorkloadUpdateController) sync(kv *virtv1.KubeVirt, data *updateData) error {
+func (c *WorkloadUpdateController) sync(kv *virtv1.KubeVirt) error {
+
+	data := c.getUpdateData(kv)
 
 	key, err := controller.KeyFunc(kv)
 	if err != nil {
@@ -418,6 +421,7 @@ func (c *WorkloadUpdateController) sync(kv *virtv1.KubeVirt, data *updateData) e
 	// optimizing here by not introducing new migration objects we know can't be processed
 	// right now.
 	maxParallelMigrations := int(*c.clusterConfig.GetMigrationConfiguration().ParallelMigrationsPerCluster)
+
 	maxNewMigrations := maxParallelMigrations - data.numActiveMigrations
 	if maxNewMigrations < 0 {
 		maxNewMigrations = 0
