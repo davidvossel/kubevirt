@@ -287,11 +287,6 @@ func (c *WorkloadUpdateController) getUpdateData(kv *virtv1.KubeVirt) *updateDat
 	automatedMigrationAllowed := false
 	automatedShutdownAllowed := false
 
-	if len(kv.Spec.WorkloadUpdateStrategy.WorkloadUpdateMethods) == 0 {
-		// migrate is the default
-		automatedMigrationAllowed = true
-	}
-
 	for _, method := range kv.Spec.WorkloadUpdateStrategy.WorkloadUpdateMethods {
 		if method == virtv1.WorkloadUpdateMethodLiveMigrate {
 			automatedMigrationAllowed = true
@@ -385,6 +380,45 @@ func (c *WorkloadUpdateController) sync(kv *virtv1.KubeVirt) error {
 	key, err := controller.KeyFunc(kv)
 	if err != nil {
 		return err
+	}
+
+	// update outdated workload count on kv
+	if kv.Status.OutdatedVMIWorkloads == nil || *kv.Status.OutdatedVMIWorkloads != len(data.allOutdatedVMIs) {
+		l := len(data.allOutdatedVMIs)
+		kvCopy := kv.DeepCopy()
+		kvCopy.Status.OutdatedVMIWorkloads = &l
+
+		oldJson, err := json.Marshal(kv.Status.OutdatedVMIWorkloads)
+		if err != nil {
+			return err
+		}
+
+		newJson, err := json.Marshal(kvCopy.Status.OutdatedVMIWorkloads)
+		if err != nil {
+			return err
+		}
+
+		patch := ""
+		if kv.Status.OutdatedVMIWorkloads == nil {
+			update := fmt.Sprintf(`{ "op": "add", "path": "/status/outdatedVMIWorkloads", "value": %s}`, string(newJson))
+			patch = fmt.Sprintf("[%s]", update)
+		} else {
+			test := fmt.Sprintf(`{ "op": "test", "path": "/status/outdatedVMIWorkloads", "value": %s}`, string(oldJson))
+			update := fmt.Sprintf(`{ "op": "replace", "path": "/status/outdatedVMIWorkloads", "value": %s}`, string(newJson))
+			patch = fmt.Sprintf("[%s, %s]", test, update)
+		}
+
+		err = c.statusUpdater.PatchStatus(kv, types.JSONPatchType, []byte(patch))
+		if err != nil {
+			return fmt.Errorf("unable to patch kubevirt obj status to update the outdatedVMIWorkloads valued: %v", err)
+		}
+	}
+
+	// Rather than enqueing based on VMI activity, we keep periodically poping the loop
+	// until all VMIs are updated. Watching all VMI activity is chatty for this controller
+	// when we don't need to be that efficent in how quickly the updates are being processed.
+	if len(data.shutdownOutdatedVMIs) != 0 || len(data.migratableOutdatedVMIs) != 0 {
+		c.queue.AddAfter(key, periodicReEnqueueIntervalSeconds)
 	}
 
 	// Randomizes list so we don't always re-attempt the same vmis in
