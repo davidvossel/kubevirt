@@ -1056,6 +1056,7 @@ spec:
 			kv.Name = "kubevirt-release-install"
 			kv.Spec.ImageTag = previousImageTag
 			kv.Spec.ImageRegistry = previousImageRegistry
+			kv.Spec.WorkloadUpdateStrategy.WorkloadUpdateMethods = []v1.WorkloadUpdateMethod{v1.WorkloadUpdateMethodLiveMigrate}
 			createKv(kv)
 
 			// Wait for Previous Release to come online
@@ -1394,7 +1395,7 @@ spec:
 			allPodsAreReady(kv)
 		})
 
-		FIt("[test_id:3150]should be able to update kubevirt install with custom image tag", func() {
+		It("[test_id:3150]should be able to update kubevirt install with custom image tag", func() {
 
 			if flags.KubeVirtVersionTagAlt == "" {
 				Skip("Skip operator custom image tag test because alt tag is not present")
