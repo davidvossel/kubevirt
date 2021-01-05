@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +37,15 @@ const (
 	SuccessfulDeleteVirtualMachineInstanceReason = "SuccessfulDelete"
 )
 
+var (
+	outdatedVMIWorkloads = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "num_outdated_vmi_workloads",
+			Help: "Indication for the number of VirtualMachineInstance workloads that are not running within the most up-to-date version of the virt-launcher environment.",
+		},
+	)
+)
+
 // time to wait before re-enqueing when outdated VMIs are still detected
 const reEnqueueIntervalSeconds = 30
 
@@ -44,6 +54,10 @@ const defaultThrottleIntervalSeconds = 5
 
 const defaultBatchDeletionIntervalSeconds = 60
 const defaultBatchDeletionCount = 10
+
+func init() {
+	prometheus.MustRegister(outdatedVMIWorkloads)
+}
 
 type WorkloadUpdateController struct {
 	clientset             kubecli.KubevirtClient
@@ -381,6 +395,8 @@ func (c *WorkloadUpdateController) sync(kv *virtv1.KubeVirt) error {
 	if err != nil {
 		return err
 	}
+
+	outdatedVMIWorkloads.Set(float64(len(data.allOutdatedVMIs)))
 
 	// update outdated workload count on kv
 	if kv.Status.OutdatedVMIWorkloads == nil || *kv.Status.OutdatedVMIWorkloads != len(data.allOutdatedVMIs) {
