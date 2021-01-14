@@ -68,6 +68,7 @@ type WorkloadUpdateController struct {
 	migrationExpectations *controller.UIDTrackingControllerExpectations
 	kubeVirtInformer      cache.SharedIndexInformer
 	clusterConfig         *virtconfig.ClusterConfig
+	statusUpdater         *status.KVStatusUpdater
 	launcherImage         string
 
 	throttleIntervalSeconds int
@@ -98,6 +99,7 @@ type updateData struct {
 }
 
 func NewWorkloadUpdateController(
+	launcherImage string,
 	vmiInformer cache.SharedIndexInformer,
 	migrationInformer cache.SharedIndexInformer,
 	kubeVirtInformer cache.SharedIndexInformer,
@@ -113,6 +115,8 @@ func NewWorkloadUpdateController(
 		kubeVirtInformer:      kubeVirtInformer,
 		recorder:              recorder,
 		clientset:             clientset,
+		statusUpdater:         status.NewKubeVirtStatusUpdater(clientset),
+		launcherImage:         launcherImage,
 		migrationExpectations: controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
 		clusterConfig:         clusterConfig,
 
@@ -271,13 +275,13 @@ func (c *WorkloadUpdateController) isOutdated(vmi *virtv1.VirtualMachineInstance
 	// This could be due to a migration, or the VMI is still
 	// initializing. virt-controller will set it for us once
 	// either the VMI is either running or done migrating.
-	if vmi.Status.CurrentLauncherImage == "" {
+	if vmi.Status.LauncherContainerImageVersion == "" {
 		return false
-	} else if vmi.Status.CurrentLauncherImage == c.launcherImage {
-		return false
+	} else if vmi.Status.LauncherContainerImageVersion != c.launcherImage {
+		return true
 	}
 
-	return true
+	return false
 }
 
 func (c *WorkloadUpdateController) getUpdateData(kv *virtv1.KubeVirt) *updateData {
