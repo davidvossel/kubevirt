@@ -29,31 +29,35 @@ echo "converting cirros image from qcow2 to raw, and copying it to local-storage
 # /local-storage will be mapped to the host dir, which will also be used by the local storage provider
 qemu-img convert -f qcow2 -O raw /images/cirros/disk.img /local-storage/cirros.img.raw
 
-# Check if attached loopdevice reach limit number (100)
-num=$(losetup -l | wc -l)
-[ ${num} -gt 100 ] && echo "attached loopdevices have reach limit number(100)" && exit 1
-
-# Put LOOP_DEVICE in /etc/bashrc in order to detach this loop device when the pod stopped.
-LOOP_DEVICE=$(losetup --find --show /local-storage/cirros.img.raw)
-echo LOOP_DEVICE=${LOOP_DEVICE} >>/etc/bashrc
-rm -f /local-storage/cirros-block-device
-ln -s $LOOP_DEVICE /local-storage/cirros-block-device
-
 echo "converting fedora image from qcow2 to raw"
 qemu-img convert -f qcow2 -O raw /images/fedora-cloud/disk.qcow2 /images/fedora-cloud/disk.img
 rm /images/fedora-cloud/disk.qcow2
 
 echo "copy all images to host mount directory"
 cp -R /images/* /hostImages/
-echo "make the alpine image ready for parallel use"
-cp -r /hostImages/alpine hostImages/alpine1
-cp -r /hostImages/alpine hostImages/alpine2
-cp -r /hostImages/alpine hostImages/alpine3
+
+for x in $(seq 3); do
+    # Check if attached loopdevice reach limit number (100)
+    num=$(losetup -l | wc -l)
+    [ ${num} -gt 100 ] && echo "attached loopdevices have reach limit number(100)" && exit 1
+
+    cp /local-storage/cirros.img.raw /local-storage/cirros${x}.img.raw
+
+    # Put DEV in /etc/bashrc in order to detach this loop device when the pod stopped.
+    DEV=$(losetup --find --show /local-storage/cirros${x}.img.raw)
+
+    echo "LOOP_DEVICE${x}=${DEV}" >>/etc/bashrc
+    rm -f /local-storage/cirros-block-device${x}
+    ln -s $DEV /local-storage/cirros-block-device${x}
+
+    echo "make the alpine image $x ready for parallel use"
+    cp -r /hostImages/alpine hostImages/alpine${x}
+    echo "make the custom image $x ready for parallel use"
+    cp -r /hostImages/custom hostImages/custom${x}
+done
+
+rm /local-storage/cirros.img.raw
 rm -rf /hostImages/alpine
-echo "make the custom image ready for parallel use"
-cp -r /hostImages/custom hostImages/custom1
-cp -r /hostImages/custom hostImages/custom2
-cp -r /hostImages/custom hostImages/custom3
 rm -rf /hostImages/custom
 chmod -R 777 /hostImages
 

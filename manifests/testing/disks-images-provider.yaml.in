@@ -72,7 +72,7 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh","-c","source /etc/bashrc && losetup -d ${LOOP_DEVICE}"]
+                command: ["/bin/sh","-c","source /etc/bashrc && losetup -d ${LOOP_DEVICE1} && losetup -d ${LOOP_DEVICE2} && losetup -d ${LOOP_DEVICE3}"]
           volumeMounts:
           - name: images
             mountPath: /hostImages
@@ -80,6 +80,11 @@ spec:
             mountPath: /local-storage
           securityContext:
             privileged: true
+            capabilities:
+              add:
+              - CAP_MKNOD
+            seLinuxOptions:
+              level: s0
           readinessProbe:
             exec:
               command:

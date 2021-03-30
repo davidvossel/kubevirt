@@ -208,9 +208,9 @@ const (
 	SecretLabel = "kubevirt.io/secret"
 )
 
-const (
+var (
 	// BlockDiskForTest contains name of the block PV and PVC
-	BlockDiskForTest = "block-disk-for-tests"
+	BlockDiskForTest string
 )
 
 const (
@@ -709,6 +709,8 @@ func BeforeTestSuitSetup(_ []byte) {
 	HostPathAlpine = filepath.Join(HostPathBase, fmt.Sprintf("%s%v", "alpine", worker))
 	HostPathCustom = filepath.Join(HostPathBase, fmt.Sprintf("%s%v", "custom", worker))
 	HostPathFedora = filepath.Join(HostPathBase, "fedora-cloud")
+
+	BlockDiskForTest = fmt.Sprintf("block-disk-for-tests%v", worker)
 
 	// Wait for schedulable nodes
 	virtClient, err := kubecli.GetKubevirtClient()
@@ -2472,6 +2474,8 @@ func newBlockVolumePV(name string, labelSelector map[string]string, size string)
 	storageClass := Config.StorageClassBlockVolume
 	volumeMode := k8sv1.PersistentVolumeBlock
 
+	worker := config.GinkgoConfig.ParallelNode
+
 	// Note: the path depends on kubevirtci!
 	// It's configured to have a device backed by a cirros image at exactly that place on node01
 	// And the local storage provider also has access to it
@@ -2489,7 +2493,7 @@ func newBlockVolumePV(name string, labelSelector map[string]string, size string)
 			VolumeMode:       &volumeMode,
 			PersistentVolumeSource: k8sv1.PersistentVolumeSource{
 				Local: &k8sv1.LocalVolumeSource{
-					Path: "/mnt/local-storage/cirros-block-device",
+					Path: fmt.Sprintf("/mnt/local-storage/cirros-block-device%v", worker),
 				},
 			},
 			NodeAffinity: &k8sv1.VolumeNodeAffinity{
