@@ -556,7 +556,11 @@ const (
 	// used to detect virtual machines with dead pods. Used on Pod.
 	DomainAnnotation string = "kubevirt.io/domain"
 	// Represents the name of the migration job this target pod is associated with
-	MigrationJobNameAnnotation                    string = "kubevirt.io/migrationJobName"
+	MigrationJobNameAnnotation string = "kubevirt.io/migrationJobName"
+	// The migration controller sets this annotation on a pod when a migration
+	// fails in order to get the target pod to exit early instead of waiting for
+	// a timeout period. This is simply an optimization.
+	MigrationJobCleanupSignalAnnotation           string = "kubevirt.io/migrationJobCleanupSignal"
 	ControllerAPILatestVersionObservedAnnotation  string = "kubevirt.io/latest-observed-api-version"
 	ControllerAPIStorageVersionObservedAnnotation string = "kubevirt.io/storage-observed-api-version"
 	// This label is used to match virtual machine instance IDs with pods.

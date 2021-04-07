@@ -157,6 +157,57 @@ func ensureSelectorLabelPresent(migration *virtv1.VirtualMachineInstanceMigratio
 	}
 }
 
+func (c *MigrationController) signalTargetPodCleanup(targetPods []*k8sv1.Pod) error {
+
+	for _, origPod := range targetPods {
+		if origPod.Status.Phase != k8sv1.PodRunning {
+			continue
+		}
+
+		patchOps := []string{}
+		pod := origPod.DeepCopy()
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+		pod.Annotations[virtv1.MigrationJobCleanupSignalAnnotation] = ""
+
+		if reflect.DeepEqual(origPod.Annotations, pod.Annotations) {
+			continue
+		}
+		annotationBytes, err := json.Marshal(pod.Annotations)
+		if err != nil {
+			return err
+		}
+		origAnnotationBytes, err := json.Marshal(origPod.Annotations)
+		if err != nil {
+			return err
+		}
+
+		if origPod.Annotations == nil {
+			patchOps = append(patchOps, fmt.Sprintf(`{ "op": "add", "path": "/metadata/annotations", "value": %s }`, string(annotationBytes)))
+		} else {
+			patchOps = append(patchOps, fmt.Sprintf(`{ "op": "test", "path": "/metadata/annotations", "value": %s }`, string(origAnnotationBytes)))
+			patchOps = append(patchOps, fmt.Sprintf(`{ "op": "replace", "path": "/metadata/annotations", "value": %s }`, string(annotationBytes)))
+		}
+		patch := "[ "
+		for i, entry := range patchOps {
+			patch += entry
+
+			if i == len(patchOps)-1 {
+				patch += " ]"
+			} else {
+				patch += ", "
+			}
+		}
+		_, err = c.clientset.CoreV1().Pods(pod.Namespace).Patch(context.Background(), pod.Name, types.JSONPatchType, []byte(patch), v1.PatchOptions{})
+		if err != nil {
+			return fmt.Errorf("patching of pod annotations to signal target pod shutdown failed: %v, %v", err, patchOps)
+		}
+	}
+
+	return nil
+}
+
 func (c *MigrationController) execute(key string) error {
 	var vmi *virtv1.VirtualMachineInstance
 	var targetPods []*k8sv1.Pod
@@ -213,7 +264,7 @@ func (c *MigrationController) execute(key string) error {
 
 	var syncErr error
 
-	if needsSync && !migration.IsFinal() {
+	if needsSync {
 		syncErr = c.sync(key, migration, vmi, targetPods)
 	}
 
@@ -441,6 +492,28 @@ func (c *MigrationController) sync(key string, migration *virtv1.VirtualMachineI
 	podExists := len(pods) > 0
 	if podExists {
 		pod = pods[0]
+	}
+
+	if migration.Status.Phase == virtv1.MigrationFailed {
+		// migration failed, signal target pods to cleanup
+		err := c.signalTargetPodCleanup(pods)
+		if err != nil {
+			return err
+		}
+	} else if !migration.IsFinal() && migration.DeletionTimestamp != nil {
+		// migration is being aborted, signal target pods to cleanup.
+		// This is safe to do even if the migration finishes before
+		// cancellation is confirmed. The target pod will only clean itself
+		// up if there are no qemu processes running in it.
+		err := c.signalTargetPodCleanup(pods)
+		if err != nil {
+			return err
+		}
+	}
+
+	if migration.IsFinal() {
+		// nothing left to do here.
+		return nil
 	}
 
 	if vmi != nil && migration.DeletionTimestamp != nil &&
