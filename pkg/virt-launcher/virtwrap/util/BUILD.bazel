@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cpu_utils.go",
+        "launcher_utils.go",
         "libvirt_helper.go",
     ],
     importpath = "kubevirt.io/kubevirt/pkg/virt-launcher/virtwrap/util",
