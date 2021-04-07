@@ -897,6 +897,27 @@ func (t *templateService) renderLaunchManifest(vmi *v1.VirtualMachineInstance, t
 		})
 	}
 
+	// pod annotations downward api volume and volume mount
+	volumeMounts = append(volumeMounts, k8sv1.VolumeMount{
+		Name:      "podinfo",
+		MountPath: filepath.Join(t.virtShareDir, "podinfo"),
+	})
+	volumes = append(volumes, k8sv1.Volume{
+		Name: "podinfo",
+		VolumeSource: k8sv1.VolumeSource{
+			DownwardAPI: &k8sv1.DownwardAPIVolumeSource{
+				Items: []k8sv1.DownwardAPIVolumeFile{
+					{
+						Path: "annotations",
+						FieldRef: &k8sv1.ObjectFieldSelector{
+							FieldPath: "metadata.annotations",
+						},
+					},
+				},
+			},
+		},
+	})
+
 	// Handle CPU pinning
 	if vmi.IsCPUDedicated() {
 		// schedule only on nodes with a running cpu manager
