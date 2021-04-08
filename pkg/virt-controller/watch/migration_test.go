@@ -22,6 +22,7 @@ package watch
 import (
 	"fmt"
 	"runtime"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -133,6 +134,13 @@ var _ = Describe("Migration watcher", func() {
 		})
 	}
 
+	shouldExpectMigrationFinalizerRemoval := func(migration *v1.VirtualMachineInstanceMigration) {
+		migrationInterface.EXPECT().Update(gomock.Any()).Do(func(arg interface{}) (interface{}, interface{}) {
+			Expect(len(arg.(*v1.VirtualMachineInstanceMigration).Finalizers)).To(Equal(0))
+			return arg, nil
+		})
+	}
+
 	shouldExpectVirtualMachineHandoff := func(vmi *v1.VirtualMachineInstance, migrationUid types.UID, targetNode string) {
 		vmiInterface.EXPECT().Update(gomock.Any()).DoAndReturn(func(arg interface{}) (interface{}, interface{}) {
 			Expect(arg.(*v1.VirtualMachineInstance).Status.MigrationState).ToNot(BeNil())
@@ -202,6 +210,14 @@ var _ = Describe("Migration watcher", func() {
 
 	AfterEach(func() {
 		close(stop)
+		/*
+			select {
+			case e := <-recorder.Events:
+				fmt.Printf("REASON -------- %s\n", e)
+				Expect(e).To(Equal("asfdas:"))
+			default:
+			}
+		*/
 		// Ensure that we add checks for expected events to every test
 		Expect(recorder.Events).To(BeEmpty())
 		ctrl.Finish()
@@ -217,6 +233,18 @@ var _ = Describe("Migration watcher", func() {
 		mockQueue.ExpectAdds(1)
 		migrationSource.Add(migration)
 		mockQueue.Wait()
+	}
+
+	shouldExpectMatchingPodPatchEarlyExit := func() {
+		// Expect pod creation
+		kubeClient.Fake.PrependReactor("patch", "pods", func(action testing.Action) (handled bool, obj runtime.Object, err error) {
+			patch, ok := action.(testing.PatchAction)
+			Expect(ok).To(BeTrue())
+
+			expectedPatchStr := "[ { \"op\": \"test\", \"path\": \"/metadata/annotations\", \"value\": {\"kubevirt.io/domain\":\"testvmi\",\"kubevirt.io/migrationJobName\":\"testmigration\"} }, { \"op\": \"replace\", \"path\": \"/metadata/annotations\", \"value\": {\"kubevirt.io/domain\":\"testvmi\",\"kubevirt.io/migrationJobCleanupSignal\":\"\",\"kubevirt.io/migrationJobName\":\"testmigration\"} } ]"
+			Expect(string(patch.GetPatch())).To(Equal(expectedPatchStr))
+			return true, nil, nil
+		})
 	}
 
 	Context("Migration object in pending state", func() {
@@ -665,6 +693,92 @@ var _ = Describe("Migration watcher", func() {
 			controller.Execute()
 			testutils.ExpectEvent(recorder, SuccessfulMigrationReason)
 		})
+
+		It("should add early exit signal annotation to target pod after failure", func() {
+			vmi := newVirtualMachine("testvmi", v1.Running)
+			vmi.Status.NodeName = "node02"
+			migration := newMigration("testmigration", vmi.Name, v1.MigrationFailed)
+			pod := newTargetPodForVirtualMachine(vmi, migration, k8sv1.PodRunning)
+			pod.Spec.NodeName = "node01"
+
+			vmi.Status.MigrationState = &v1.VirtualMachineInstanceMigrationState{
+				MigrationUID:      migration.UID,
+				TargetNode:        "node01",
+				SourceNode:        "node02",
+				TargetNodeAddress: "10.10.10.10:1234",
+				StartTimestamp:    now(),
+				EndTimestamp:      now(),
+				Failed:            true,
+				Completed:         true,
+			}
+			addMigration(migration)
+			addVirtualMachineInstance(vmi)
+			podFeeder.Add(pod)
+
+			shouldExpectMatchingPodPatchEarlyExit()
+			shouldExpectMigrationFinalizerRemoval(migration)
+			controller.Execute()
+		})
+		It("should add early exit signal annotation to target pod during cancel ", func() {
+			vmi := newVirtualMachine("testvmi", v1.Running)
+			vmi.Status.NodeName = "node02"
+			migration := newMigration("testmigration", vmi.Name, v1.MigrationScheduling)
+			migration.DeletionTimestamp = now()
+			migration.Status.Conditions = []v1.VirtualMachineInstanceMigrationCondition{}
+			pod := newTargetPodForVirtualMachine(vmi, migration, k8sv1.PodRunning)
+			pod.Spec.NodeName = "node01"
+
+			vmi.Status.MigrationState = &v1.VirtualMachineInstanceMigrationState{
+				MigrationUID:      migration.UID,
+				TargetNode:        "node01",
+				SourceNode:        "node02",
+				TargetNodeAddress: "10.10.10.10:1234",
+				StartTimestamp:    now(),
+				EndTimestamp:      now(),
+				Failed:            true,
+				Completed:         true,
+			}
+			addMigration(migration)
+			addVirtualMachineInstance(vmi)
+			podFeeder.Add(pod)
+
+			shouldExpectMatchingPodPatchEarlyExit()
+
+			shouldExpectMigrationFailedState(migration)
+			controller.Execute()
+			testutils.ExpectEvent(recorder, FailedMigrationReason)
+		})
+
+		It("should not add early exit annotation to target pods not matching the migration UID", func() {
+			vmi := newVirtualMachine("testvmi", v1.Running)
+			vmi.Status.NodeName = "node02"
+			migration := newMigration("testmigration", vmi.Name, v1.MigrationFailed)
+			pod := newTargetPodForVirtualMachine(vmi, migration, k8sv1.PodRunning)
+			pod.Spec.NodeName = "node01"
+			pod.Labels[v1.MigrationJobLabel] = "someothermigration"
+
+			vmi.Status.MigrationState = &v1.VirtualMachineInstanceMigrationState{
+				MigrationUID:      migration.UID,
+				TargetNode:        "node01",
+				SourceNode:        "node02",
+				TargetNodeAddress: "10.10.10.10:1234",
+				StartTimestamp:    now(),
+				EndTimestamp:      now(),
+				Failed:            true,
+				Completed:         true,
+			}
+			podSource.Add(pod)
+			// add a brief sleep here since adding this pod won't actually
+			// result in queuing the migration since this pod isn't associated
+			// with the migration, only the vmi
+			time.Sleep(1 * time.Second)
+			addMigration(migration)
+			addVirtualMachineInstance(vmi)
+
+			shouldExpectMigrationFinalizerRemoval(migration)
+			controller.Execute()
+		})
+
 		It("should delete itself if VMI no longer exists", func() {
 			migration := newMigration("testmigration", "somevmi", v1.MigrationRunning)
 			addMigration(migration)
