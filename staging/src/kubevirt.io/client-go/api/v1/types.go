@@ -560,7 +560,11 @@ const (
 	// The migration controller sets this annotation on a pod when a migration
 	// fails in order to get the target pod to exit early instead of waiting for
 	// a timeout period. This is simply an optimization.
-	MigrationJobCleanupSignalAnnotation           string = "kubevirt.io/migrationJobCleanupSignal"
+	MigrationJobCleanupSignalAnnotation string = "kubevirt.io/migrationJobCleanupSignal"
+	// This annotation is used for functional testing purposes only. It allows us
+	// to time when the migration controller performs the handoff of a target pod
+	// to virt-handler
+	MigrationJobPauseHandoffAnnotation            string = "kubevirt.io/migrationJobPauseHandoff"
 	ControllerAPILatestVersionObservedAnnotation  string = "kubevirt.io/latest-observed-api-version"
 	ControllerAPIStorageVersionObservedAnnotation string = "kubevirt.io/storage-observed-api-version"
 	// This label is used to match virtual machine instance IDs with pods.

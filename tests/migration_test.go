@@ -435,6 +435,57 @@ var _ = Describe("[Serial][rfe_id:393][crit:high][vendor:cnv-qe@redhat.com][leve
 				By("Waiting for VMI to disappear")
 				tests.WaitForVirtualMachineToDisappearWithTimeout(vmi, 240)
 			})
+			It("should signal target pod to cleanup when canceled.", func() {
+				vmi := tests.NewRandomVMIWithEphemeralDisk(cd.ContainerDiskFor(cd.ContainerDiskCirros))
+				tests.AddUserData(vmi, "cloud-init", "#!/bin/bash\necho 'hello'\n")
+
+				By("Starting the VirtualMachineInstance")
+				vmi = runVMIAndExpectLaunch(vmi, 240)
+
+				By("Starting a Migration")
+				migration := tests.NewRandomMigration(vmi.Name, vmi.Namespace)
+				// use a special annotation to tell the migration controller to create
+				// the target pod, but never hand it off to virt-handler
+				migration.Annotations = map[string]string{v1.MigrationJobPauseHandoffAnnotation: ""}
+				migration, err := virtClient.VirtualMachineInstanceMigration(migration.Namespace).Create(migration)
+				Expect(err).ToNot(HaveOccurred())
+
+				var targetPod *k8sv1.Pod
+
+				Eventually(func() error {
+					targetPod, err = tests.GetRunningPodByLabel(string(migration.UID), v1.MigrationJobLabel, migration.Namespace, "")
+
+					if err == nil && targetPod.Status.Phase != k8sv1.PodRunning {
+						return fmt.Errorf("waiting on target pod to be in running state")
+					}
+					return err
+				}, 180*time.Second, time.Second).Should(Succeed(), "Should find target pod for migration")
+
+				By("Cancelling a Migration")
+				Expect(virtClient.VirtualMachineInstanceMigration(migration.Namespace).Delete(migration.Name, &metav1.DeleteOptions{})).To(Succeed(), "Migration should be deleted successfully")
+
+				Eventually(func() error {
+					pod, err := virtClient.CoreV1().Pods(targetPod.Namespace).Get(context.Background(), targetPod.Name, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+
+					_, hasSignal := pod.Annotations[v1.MigrationJobCleanupSignalAnnotation]
+					if !hasSignal {
+						return fmt.Errorf("waiting on job cleanup annotation")
+					} else if pod.Status.Phase == k8sv1.PodRunning {
+						return fmt.Errorf("waiting on target pod to terminate")
+					}
+					return nil
+				}, 60*time.Second, time.Second).Should(Succeed(), "Should find target pod with early exit annotation in a terminated state")
+
+				// delete VMI
+				By("Deleting the VMI")
+				Expect(virtClient.VirtualMachineInstance(vmi.Namespace).Delete(vmi.Name, &metav1.DeleteOptions{})).To(Succeed())
+
+				By("Waiting for VMI to disappear")
+				tests.WaitForVirtualMachineToDisappearWithTimeout(vmi, 240)
+			})
 
 			It("should migrate vmi with cdroms on various bus types", func() {
 				vmi := tests.NewRandomVMIWithEphemeralDisk(cd.ContainerDiskFor(cd.ContainerDiskCirros))

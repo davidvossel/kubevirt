@@ -486,6 +486,22 @@ func (c *MigrationController) createTargetPod(migration *virtv1.VirtualMachineIn
 	return nil
 }
 
+// The ability to pause the handoff of the target pod to virt-handler
+// is something the functional tests use to impact timing. This ability
+// gives the functional tests a way to invoke certain failure conditions
+// that are very difficult to time otherwise
+func shouldPauseHandoff(migration *virtv1.VirtualMachineInstanceMigration) bool {
+	pauseHandoff := false
+	if migration.Annotations != nil {
+		_, ok := migration.Annotations[virtv1.MigrationJobPauseHandoffAnnotation]
+		if ok {
+			pauseHandoff = true
+		}
+	}
+
+	return pauseHandoff
+}
+
 func (c *MigrationController) sync(key string, migration *virtv1.VirtualMachineInstanceMigration, vmi *virtv1.VirtualMachineInstance, pods []*k8sv1.Pod) error {
 
 	var pod *k8sv1.Pod = nil
@@ -610,9 +626,10 @@ func (c *MigrationController) sync(key string, migration *virtv1.VirtualMachineI
 			return nil
 		}()
 	case virtv1.MigrationScheduled:
+
 		// once target pod is scheduled, alert the VMI of the migration by
 		// setting the target and source nodes. This kicks off the preparation stage.
-		if podExists && !podIsDown(pod) {
+		if podExists && !podIsDown(pod) && !shouldPauseHandoff(migration) {
 			vmiCopy := vmi.DeepCopy()
 			vmiCopy.Status.MigrationState = &virtv1.VirtualMachineInstanceMigrationState{
 				MigrationUID: migration.UID,
