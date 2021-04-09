@@ -95,7 +95,6 @@ func ExpectEvents(recorder *record.FakeRecorder, reasons ...string) {
 			filtered := []string{}
 			found := false
 			for _, reason := range reasons {
-
 				if strings.Contains(e, reason) && !found {
 					found = true
 					continue
