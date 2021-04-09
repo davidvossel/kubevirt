@@ -210,14 +210,6 @@ var _ = Describe("Migration watcher", func() {
 
 	AfterEach(func() {
 		close(stop)
-		/*
-			select {
-			case e := <-recorder.Events:
-				fmt.Printf("REASON -------- %s\n", e)
-				Expect(e).To(Equal("asfdas:"))
-			default:
-			}
-		*/
 		// Ensure that we add checks for expected events to every test
 		Expect(recorder.Events).To(BeEmpty())
 		ctrl.Finish()
@@ -237,7 +229,7 @@ var _ = Describe("Migration watcher", func() {
 
 	shouldExpectMatchingPodPatchEarlyExit := func() {
 		// Expect pod creation
-		kubeClient.Fake.PrependReactor("patch", "pods", func(action testing.Action) (handled bool, obj runtime.Object, err error) {
+		kubeClient.Fake.PrependReactor("patch", "pods", func(action testing.Action) (handled bool, obj k8sruntime.Object, err error) {
 			patch, ok := action.(testing.PatchAction)
 			Expect(ok).To(BeTrue())
 
@@ -259,6 +251,22 @@ var _ = Describe("Migration watcher", func() {
 			controller.Execute()
 
 			testutils.ExpectEvent(recorder, SuccessfulCreatePodReason)
+		})
+		It("should not create target pod if multiple pods exist in a non finalized state for VMI", func() {
+			vmi := newVirtualMachine("testvmi", v1.Running)
+			migration := newMigration("testmigration", vmi.Name, v1.MigrationPending)
+
+			pod1 := newTargetPodForVirtualMachine(vmi, migration, k8sv1.PodPending)
+			pod1.Labels[v1.MigrationJobLabel] = "some other job"
+			pod2 := newTargetPodForVirtualMachine(vmi, migration, k8sv1.PodRunning)
+			pod2.Labels[v1.MigrationJobLabel] = "some other job"
+			podInformer.GetStore().Add(pod1)
+			podInformer.GetStore().Add(pod2)
+
+			addMigration(migration)
+			addVirtualMachineInstance(vmi)
+
+			controller.Execute()
 		})
 
 		It("should create another target pods if only 4 migrations are in progress", func() {
