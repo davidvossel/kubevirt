@@ -47,6 +47,7 @@ func (VirtualMachineInstanceStatus) SwaggerDoc() map[string]string {
 		"reason":                        "A brief CamelCase message indicating details about why the VMI is in this state. e.g. 'NodeUnresponsive'\n+optional",
 		"conditions":                    "Conditions are specific points in VirtualMachineInstance's pod runtime.",
 		"phase":                         "Phase is the status of the VirtualMachineInstance in kubernetes world. It is not the VirtualMachineInstance status, but partially correlates to it.",
+		"phaseTransitionTimestamp":      "PhaseTransitionTimestamp is the timestamp of when the last phase change occurred\n+nullable",
 		"interfaces":                    "Interfaces represent the details of available network interfaces.",
 		"guestOSInfo":                   "Guest OS Information",
 		"migrationState":                "Represents the status of a live migration",

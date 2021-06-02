@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"runtime/debug"
 	"strings"
+	"time"
 
 	k8sv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -294,4 +295,11 @@ func VMIActivePodsCount(vmi *v1.VirtualMachineInstance, vmiPodInformer cache.Sha
 func GeneratePatchBytes(ops []string) []byte {
 
 	return []byte(fmt.Sprintf("[%s]", strings.Join(ops, ", ")))
+}
+
+func SetVMIPhaseTransitionTimestamp(oldVMI *v1.VirtualMachineInstance, newVMI *v1.VirtualMachineInstance) {
+	if oldVMI.Status.Phase != newVMI.Status.Phase {
+		now := metav1.NewTime(time.Now())
+		newVMI.Status.PhaseTransitionTimestamp = &now
+	}
 }

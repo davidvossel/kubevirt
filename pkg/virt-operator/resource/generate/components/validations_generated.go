@@ -7845,6 +7845,12 @@ var CRDsValidation map[string]string = map[string]string{
             world. It is not the VirtualMachineInstance status, but partially correlates
             to it.
           type: string
+        phaseTransitionTimestamp:
+          description: PhaseTransitionTimestamp is the timestamp of when the last
+            phase change occurred
+          format: date-time
+          nullable: true
+          type: string
         qosClass:
           description: 'The Quality of Service (QOS) classification assigned to the
             virtual machine instance based on resource requirements See PodQOSClass

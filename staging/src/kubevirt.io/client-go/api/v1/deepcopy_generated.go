@@ -3729,6 +3729,10 @@ func (in *VirtualMachineInstanceStatus) DeepCopyInto(out *VirtualMachineInstance
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.PhaseTransitionTimestamp != nil {
+		in, out := &in.PhaseTransitionTimestamp, &out.PhaseTransitionTimestamp
+		*out = (*in).DeepCopy()
+	}
 	if in.Interfaces != nil {
 		in, out := &in.Interfaces, &out.Interfaces
 		*out = make([]VirtualMachineInstanceNetworkInterface, len(*in))
