@@ -55,6 +55,15 @@ var (
 		},
 		nil,
 	)
+
+	vmiPhaseTransitionTimeDesc = prometheus.NewDesc(
+		"kubevirt_vmi_phase_transition_seconds_since_creation",
+		"How long in seconds it has taken since VMI creation time to transition to the current VMI phase.",
+		[]string{
+			"node", "namespace", "name", "phase",
+		},
+		nil,
+	)
 )
 
 type vmiCountMetric struct {
@@ -99,7 +108,7 @@ func (co *VMICollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	updateVMIsPhase(vmis, ch)
-	updateVMIEvictionBlocker(vmis, ch)
+	updateVMIMetrics(vmis, ch)
 	return
 }
 
@@ -171,15 +180,45 @@ func checkNonEvictableVMAndSetMetric(vmi *k6tv1.VirtualMachineInstance) float64 
 	return setVal
 }
 
-func updateVMIEvictionBlocker(vmis []*k6tv1.VirtualMachineInstance, ch chan<- prometheus.Metric) {
+func updateVMIMetrics(vmis []*k6tv1.VirtualMachineInstance, ch chan<- prometheus.Metric) {
 	for _, vmi := range vmis {
+		updateVMIEvictionBlocker(vmi, ch)
+		updateVMIPhaseTransitionTime(vmi, ch)
+	}
+}
+
+func updateVMIEvictionBlocker(vmi *k6tv1.VirtualMachineInstance, ch chan<- prometheus.Metric) {
+	mv, err := prometheus.NewConstMetric(
+		vmiEvictionBlockerDesc, prometheus.GaugeValue,
+		checkNonEvictableVMAndSetMetric(vmi),
+		vmi.Status.NodeName, vmi.Namespace, vmi.Name,
+	)
+	if err != nil {
+		return
+	}
+	ch <- mv
+
+}
+
+func updateVMIPhaseTransitionTime(vmi *k6tv1.VirtualMachineInstance, ch chan<- prometheus.Metric) {
+	if vmi.Status.PhaseTransitionTimestamp != nil {
+		transition := vmi.Status.PhaseTransitionTimestamp.Time
+		creation := vmi.CreationTimestamp.Time
+
+		diffSeconds := transition.Sub(creation).Seconds()
+
+		if diffSeconds < 0 {
+			// ignore if there is timestamp skew
+			return
+		}
+
 		mv, err := prometheus.NewConstMetric(
-			vmiEvictionBlockerDesc, prometheus.GaugeValue,
-			checkNonEvictableVMAndSetMetric(vmi),
-			vmi.Status.NodeName, vmi.Namespace, vmi.Name,
+			vmiPhaseTransitionTimeDesc, prometheus.GaugeValue,
+			float64(diffSeconds),
+			vmi.Status.NodeName, vmi.Name, vmi.Namespace, string(vmi.Status.Phase),
 		)
 		if err != nil {
-			continue
+			return
 		}
 		ch <- mv
 	}
