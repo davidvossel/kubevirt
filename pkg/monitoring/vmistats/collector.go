@@ -21,8 +21,10 @@ package vmistats
 
 import (
 	"strings"
+	"time"
 
 	k8sv1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -83,14 +85,14 @@ func (co *VMICollector) Describe(_ chan<- *prometheus.Desc) {
 }
 
 // does VMI informer stuff
-func SetupVMICollector(vmiInformer cache.SharedIndexInformer) *VMICollector {
+func SetupVMICollector(vmiInformer cache.SharedIndexInformer) {
 	log.Log.Infof("Starting vmi collector")
 	co := &VMICollector{
 		vmiInformer: vmiInformer,
 	}
 
+	prometheus.MustRegister(newVMIPhaseTransitionTimeHistogramVec(vmiInformer))
 	prometheus.MustRegister(co)
-	return co
 }
 
 // Note that Collect could be called concurrently
@@ -228,4 +230,81 @@ func updateVMIPhaseTransitionTime(vmi *k6tv1.VirtualMachineInstance, ch chan<- p
 		}
 		ch <- mv
 	}
+}
+
+func updateVMIPhaseTransitionTimeHistogramVec(histogramVec *prometheus.HistogramVec, oldVMI *k6tv1.VirtualMachineInstance, newVMI *k6tv1.VirtualMachineInstance) {
+	if oldVMI == nil || oldVMI.Status.Phase == newVMI.Status.Phase {
+		return
+	}
+	var oldTime *metav1.Time
+	var newTime *metav1.Time
+
+	if oldVMI.Status.Phase == k6tv1.VmPhaseUnset {
+		oldTime = &newVMI.CreationTimestamp
+	}
+	for _, transitionTimestamp := range newVMI.Status.PhaseTransitionTimestamps {
+		if transitionTimestamp.Phase == newVMI.Status.Phase {
+			newTime = &transitionTimestamp.PhaseTransitionTimestamp
+		} else if transitionTimestamp.Phase == oldVMI.Status.Phase {
+			oldTime = &transitionTimestamp.PhaseTransitionTimestamp
+		}
+	}
+
+	if newTime == nil || oldTime == nil {
+		// no phase transition timestamp found
+		return
+	}
+
+	labels := []string{newVMI.Namespace, newVMI.Name, string(newVMI.Status.Phase), string(oldVMI.Status.Phase), newVMI.Status.NodeName}
+	histogram, err := histogramVec.GetMetricWithLabelValues(labels...)
+	if err != nil {
+		log.Log.Reason(err).Error("Failed to get a histogram for a vmi lifecycle transition times")
+		return
+	}
+	histogram.Observe(newTime.Sub(oldTime.Time).Seconds())
+}
+
+func newVMIPhaseTransitionTimeHistogramVec(informer cache.SharedIndexInformer) *prometheus.HistogramVec {
+	histogramVec := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "kubevirt_vmi_phase_transition_time_seconds",
+			Buckets: []float64{
+				time.Minute.Seconds() / 2,
+				(1 * time.Minute).Seconds(),
+				(2 * time.Minute).Seconds(),
+				(5 * time.Minute).Seconds(),
+				(10 * time.Minute).Seconds(),
+				(1 * time.Hour).Seconds() / 2,
+				(1 * time.Hour).Seconds(),
+				(2 * time.Hour).Seconds(),
+				(3 * time.Hour).Seconds(),
+				(4 * time.Hour).Seconds(),
+				(5 * time.Hour).Seconds(),
+				(6 * time.Hour).Seconds(),
+				(7 * time.Hour).Seconds(),
+				(8 * time.Hour).Seconds(),
+				(9 * time.Hour).Seconds(),
+				(10 * time.Hour).Seconds(),
+			},
+		},
+		[]string{
+			// namespace of the vmi
+			"namespace",
+			// name of the vmi
+			"name",
+			// phase of the vmi
+			"phase",
+			// last phase of the vmi
+			"last_phase",
+			// node the vmi resides on
+			"node",
+		},
+	)
+
+	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: func(oldVMI, newVMI interface{}) {
+			updateVMIPhaseTransitionTimeHistogramVec(histogramVec, oldVMI.(*k6tv1.VirtualMachineInstance), newVMI.(*k6tv1.VirtualMachineInstance))
+		},
+	})
+	return histogramVec
 }
