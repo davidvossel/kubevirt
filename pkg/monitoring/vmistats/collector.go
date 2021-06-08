@@ -201,8 +201,14 @@ func updateVMIEvictionBlocker(vmi *k6tv1.VirtualMachineInstance, ch chan<- prome
 }
 
 func updateVMIPhaseTransitionTime(vmi *k6tv1.VirtualMachineInstance, ch chan<- prometheus.Metric) {
-	if vmi.Status.PhaseTransitionTimestamp != nil {
-		transition := vmi.Status.PhaseTransitionTimestamp.Time
+
+	for _, transitionTime := range vmi.Status.PhaseTransitionTimestamps {
+
+		if transitionTime.Phase != vmi.Status.Phase {
+			continue
+		}
+
+		transition := transitionTime.PhaseTransitionTimestamp.Time
 		creation := vmi.CreationTimestamp.Time
 
 		diffSeconds := transition.Sub(creation).Seconds()

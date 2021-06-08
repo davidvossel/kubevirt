@@ -167,6 +167,16 @@ type VirtualMachineInstanceSpec struct {
 	AccessCredentials []AccessCredential `json:"accessCredentials,omitempty"`
 }
 
+// VirtualMachineInstancePhaseTransitionTimestamp gives a timestamp in relation to when a phase is set on a vmi
+//
+// +k8s:openapi-gen=true
+type VirtualMachineInstancePhaseTransitionTimestamp struct {
+	// Phase is the status of the VirtualMachineInstance in kubernetes world. It is not the VirtualMachineInstance status, but partially correlates to it.
+	Phase VirtualMachineInstancePhase `json:"phase,omitempty"`
+	// PhaseTransitionTimestamp is the timestamp of when the phase change occurred
+	PhaseTransitionTimestamp metav1.Time `json:"phaseTransitionTimestamp,omitempty"`
+}
+
 // VirtualMachineInstanceStatus represents information about the status of a VirtualMachineInstance. Status may trail the actual
 // state of a system.
 //
@@ -182,8 +192,9 @@ type VirtualMachineInstanceStatus struct {
 	// Phase is the status of the VirtualMachineInstance in kubernetes world. It is not the VirtualMachineInstance status, but partially correlates to it.
 	Phase VirtualMachineInstancePhase `json:"phase,omitempty"`
 	// PhaseTransitionTimestamp is the timestamp of when the last phase change occurred
-	// +nullable
-	PhaseTransitionTimestamp *metav1.Time `json:"phaseTransitionTimestamp,omitempty"`
+	// +listType=atomic
+	// +optional
+	PhaseTransitionTimestamps []VirtualMachineInstancePhaseTransitionTimestamp `json:"phaseTransitionTimestamps,omitempty"`
 	// Interfaces represent the details of available network interfaces.
 	Interfaces []VirtualMachineInstanceNetworkInterface `json:"interfaces,omitempty"`
 	// Guest OS Information

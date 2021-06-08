@@ -124,8 +124,8 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 	shouldExpectVirtualMachineHandover := func(vmi *v1.VirtualMachineInstance) {
 		vmiInterface.EXPECT().Update(gomock.Any()).Do(func(arg interface{}) {
 			Expect(arg.(*v1.VirtualMachineInstance).Status.Phase).To(Equal(v1.Scheduled))
-			Expect(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamp).ToNot(BeNil())
-			Expect(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamp).ToNot(Equal(vmi.Status.PhaseTransitionTimestamp))
+			Expect(len(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamps)).ToNot(Equal(0))
+			Expect(len(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamps)).ToNot(Equal(len(vmi.Status.PhaseTransitionTimestamps)))
 			Expect(arg.(*v1.VirtualMachineInstance).Status.Conditions).To(BeEmpty())
 		}).Return(vmi, nil)
 	}
@@ -141,8 +141,8 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 		vmiInterface.EXPECT().Update(gomock.Any()).Do(func(arg interface{}) {
 			Expect(arg.(*v1.VirtualMachineInstance).Status.Phase).To(Equal(v1.Scheduling))
 			Expect(arg.(*v1.VirtualMachineInstance).Status.Conditions).To(BeEmpty())
-			Expect(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamp).ToNot(BeNil())
-			Expect(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamp).ToNot(Equal(vmi.Status.PhaseTransitionTimestamp))
+			Expect(len(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamps)).ToNot(Equal(0))
+			Expect(len(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamps)).ToNot(Equal(len(vmi.Status.PhaseTransitionTimestamps)))
 		}).Return(vmi, nil)
 	}
 
@@ -150,8 +150,8 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 		vmiInterface.EXPECT().Update(gomock.Any()).Do(func(arg interface{}) {
 			Expect(arg.(*v1.VirtualMachineInstance).Status.Phase).To(Equal(v1.Scheduled))
 			Expect(arg.(*v1.VirtualMachineInstance).Status.Conditions).To(BeEmpty())
-			Expect(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamp).ToNot(BeNil())
-			Expect(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamp).ToNot(Equal(vmi.Status.PhaseTransitionTimestamp))
+			Expect(len(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamps)).ToNot(Equal(0))
+			Expect(len(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamps)).ToNot(Equal(len(vmi.Status.PhaseTransitionTimestamps)))
 		}).Return(vmi, nil)
 	}
 
@@ -159,8 +159,8 @@ var _ = Describe("VirtualMachineInstance watcher", func() {
 		vmiInterface.EXPECT().Update(gomock.Any()).Do(func(arg interface{}) {
 			Expect(arg.(*v1.VirtualMachineInstance).Status.Phase).To(Equal(v1.Failed))
 			Expect(arg.(*v1.VirtualMachineInstance).Status.Conditions).To(BeEmpty())
-			Expect(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamp).ToNot(BeNil())
-			Expect(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamp).ToNot(Equal(vmi.Status.PhaseTransitionTimestamp))
+			Expect(len(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamps)).ToNot(Equal(0))
+			Expect(len(arg.(*v1.VirtualMachineInstance).Status.PhaseTransitionTimestamps)).ToNot(Equal(len(vmi.Status.PhaseTransitionTimestamps)))
 		}).Return(vmi, nil)
 	}
 

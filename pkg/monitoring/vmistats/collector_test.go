@@ -122,7 +122,12 @@ func createVMISForPhaseTransitionTime(phase k6tv1.VirtualMachineInstancePhase, o
 	}
 
 	if hasTransitionTime {
-		vmis[0].Status.PhaseTransitionTimestamp = &now
+		vmis[0].Status.PhaseTransitionTimestamps = []k6tv1.VirtualMachineInstancePhaseTransitionTimestamp{
+			{
+				Phase:                    phase,
+				PhaseTransitionTimestamp: now,
+			},
+		}
 	}
 
 	return vmis

@@ -673,8 +673,8 @@ var _ = Describe("VirtualMachineInstance", func() {
 
 			vmiInterface.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj interface{}) (*v1.VirtualMachineInstance, error) {
 				vmi := obj.(*v1.VirtualMachineInstance)
-				Expect(vmi.Status.PhaseTransitionTimestamp).ToNot(BeNil())
-				updatedVMI.Status.PhaseTransitionTimestamp = vmi.Status.PhaseTransitionTimestamp
+				Expect(len(vmi.Status.PhaseTransitionTimestamps)).ToNot(Equal(0))
+				updatedVMI.Status.PhaseTransitionTimestamps = vmi.Status.PhaseTransitionTimestamps
 
 				Expect(vmi).To(Equal(updatedVMI))
 				return vmi, nil

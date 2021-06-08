@@ -299,7 +299,17 @@ func GeneratePatchBytes(ops []string) []byte {
 
 func SetVMIPhaseTransitionTimestamp(oldVMI *v1.VirtualMachineInstance, newVMI *v1.VirtualMachineInstance) {
 	if oldVMI.Status.Phase != newVMI.Status.Phase {
+		for _, transitionTimeStamp := range newVMI.Status.PhaseTransitionTimestamps {
+			if transitionTimeStamp.Phase == newVMI.Status.Phase {
+				// already exists.
+				return
+			}
+		}
+
 		now := metav1.NewTime(time.Now())
-		newVMI.Status.PhaseTransitionTimestamp = &now
+		newVMI.Status.PhaseTransitionTimestamps = append(newVMI.Status.PhaseTransitionTimestamps, v1.VirtualMachineInstancePhaseTransitionTimestamp{
+			Phase:                    newVMI.Status.Phase,
+			PhaseTransitionTimestamp: now,
+		})
 	}
 }
