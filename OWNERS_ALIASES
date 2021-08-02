@@ -63,3 +63,5 @@ aliases:
       - phoracek
       - qinqon
       - rhrazdil
+  sig-scale-approvers:
+      - rthallisey
