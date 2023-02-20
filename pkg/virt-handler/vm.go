@@ -690,7 +690,7 @@ type NetworkStatus struct {
 	Interface string   `yaml:"interface"`
 }
 
-func (d *VirtualMachineController) migrationTargetUpdateVMIStatus(vmi *v1.VirtualMachineInstance, domainExists bool) error {
+func (d *VirtualMachineController) migrationTargetUpdateVMIStatus(vmi *v1.VirtualMachineInstance, domainExists bool, domain *api.Domain) error {
 
 	vmiCopy := vmi.DeepCopy()
 
@@ -700,11 +700,22 @@ func (d *VirtualMachineController) migrationTargetUpdateVMIStatus(vmi *v1.Virtua
 	}
 
 	// Handle post migration
-	if domainExists && vmi.Status.MigrationState != nil && !vmi.Status.MigrationState.TargetNodeDomainDetected {
+	if domainExists &&
+		domain.Status.Status == api.Running &&
+		vmi.Status.MigrationState != nil &&
+		!vmi.Status.MigrationState.TargetNodeDomainDetected {
+
+		// record the moment we detected the domain is running.
+		// This is used as a trigger to help coordinate when CNI drivers
+		// fail over the IP to the new pod.
+		now := metav1.NewTime(time.Now())
+		vmiCopy.Status.MigrationState.TargetNodeDomainStartTimestamp = &now
+
 		// record that we've see the domain populated on the target's node
-		log.Log.Object(vmi).Info("The target node received the migrated domain")
+		log.Log.Object(vmi).Info("The target node received the running migrated domain")
 		vmiCopy.Status.MigrationState.TargetNodeDomainDetected = true
 		d.finalizeMigration(vmi)
+
 	}
 
 	if !migrations.IsMigrating(vmi) {
@@ -1613,7 +1624,7 @@ func (d *VirtualMachineController) migrationTargetExecute(vmi *v1.VirtualMachine
 			return err
 		}
 
-		err = d.migrationTargetUpdateVMIStatus(vmi, domainExists)
+		err = d.migrationTargetUpdateVMIStatus(vmi, domainExists, domain)
 		if err != nil {
 			return err
 		}

@@ -2018,7 +2018,14 @@ var _ = Describe("VirtualMachineInstance", func() {
 			vmiUpdated.Status.MigrationState.TargetNodeDomainDetected = true
 			client.EXPECT().Ping().AnyTimes()
 			client.EXPECT().FinalizeVirtualMachineMigration(vmi)
-			vmiInterface.EXPECT().Update(context.Background(), vmiUpdated)
+
+			vmiInterface.EXPECT().Update(context.Background(), gomock.Any()).Do(func(ctx context.Context, vmiObj *v1.VirtualMachineInstance) {
+
+				Expect(vmiObj.Status.MigrationState.TargetNodeDomainStartTimestamp).ToNot(BeNil())
+				vmiUpdated.Status.MigrationState.TargetNodeDomainStartTimestamp = vmiObj.Status.MigrationState.TargetNodeDomainStartTimestamp
+
+				Expect(vmiObj).To(Equal(vmiUpdated))
+			})
 
 			controller.Execute()
 		})

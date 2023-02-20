@@ -609,6 +609,8 @@ type VirtualMachineInstanceMigrationState struct {
 	// +nullable
 	EndTimestamp *metav1.Time `json:"endTimestamp,omitempty"`
 
+	// The timestamp at which the target node detects the domain is active
+	TargetNodeDomainStartTimestamp *metav1.Time `json:"targetNodeDomainStartTimestamp,omitempty"`
 	// The Target Node has seen the Domain Start Event
 	TargetNodeDomainDetected bool `json:"targetNodeDomainDetected,omitempty"`
 	// The address of the target node to use for the migration
@@ -901,6 +903,10 @@ const (
 	// PVCMemoryDumpAnnotation is the name of the memory dump representing the vm name,
 	// pvc name and the timestamp the memory dump was collected
 	PVCMemoryDumpAnnotation string = "kubevirt.io/memory-dump"
+
+	// MigrationTargetStartTimestamp indicates the time at which the target node
+	// detected that the VMI became active on the target during live migration.
+	MigrationTargetStartTimestamp string = "kubevirt.io/migration-target-start-timestamp"
 )
 
 func NewVMI(name string, uid types.UID) *VirtualMachineInstance {

@@ -21208,6 +21208,12 @@ func schema_kubevirtio_api_core_v1_VirtualMachineInstanceMigrationState(ref comm
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},
+					"targetNodeDomainStartTimestamp": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The timestamp at which the target node detects the domain is active",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
 					"targetNodeDomainDetected": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The Target Node has seen the Domain Start Event",

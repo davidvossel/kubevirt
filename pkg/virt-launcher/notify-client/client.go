@@ -238,9 +238,37 @@ func newWatchEventError(err error) watch.Event {
 	return watch.Event{Type: watch.Error, Object: &metav1.Status{Status: metav1.StatusFailure, Message: err.Error()}}
 }
 
+func humanReadableLibvirtEvent(event int) string {
+	switch int(event) {
+	case 0:
+		return "VIR_DOMAIN_EVENT_DEFINED"
+	case 1:
+		return "VIR_DOMAIN_EVENT_UNDEFINED"
+	case 2:
+		return "VIR_DOMAIN_EVENT_STARTED"
+	case 3:
+		return "VIR_DOMAIN_EVENT_SUSPENDED"
+	case 4:
+		return "VIR_DOMAIN_EVENT_RESUMED"
+	case 5:
+		return "VIR_DOMAIN_EVENT_STOPPED"
+	case 6:
+		return "VIR_DOMAIN_EVENT_SHUTDOWN"
+	case 7:
+		return "VIR_DOMAIN_EVENT_PMSUSPENDED"
+	case 8:
+		return "VIR_DOMAIN_EVENT_CRASHED"
+	case 9:
+		return "VIR_DOMAIN_EVENT_LAST"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 func eventCallback(c cli.Connection, domain *api.Domain, libvirtEvent libvirtEvent, client *Notifier, events chan watch.Event,
 	interfaceStatus []api.InterfaceStatus, osInfo *api.GuestOSInfo, vmi *v1.VirtualMachineInstance, fsFreezeStatus *api.FSFreeze,
 	metadataCache *metadata.Cache) {
+
 	d, err := c.LookupDomainByName(util.DomainFromNamespaceName(domain.ObjectMeta.Namespace, domain.ObjectMeta.Name))
 	if err != nil {
 		if !domainerrors.IsNotFound(err) {
@@ -460,7 +488,8 @@ func (n *Notifier) StartDomainNotifier(
 	}()
 
 	domainEventLifecycleCallback := func(c *libvirt.Connect, d *libvirt.Domain, event *libvirt.DomainEventLifecycle) {
-		log.Log.Infof("DomainLifecycle event %d with reason %d received", event.Event, event.Detail)
+
+		log.Log.Infof("DomainLifecycle event %d [%s] with detail reason %d received", event.Event, humanReadableLibvirtEvent(int(event.Event)), event.Detail)
 		name, err := d.GetName()
 		if err != nil {
 			log.Log.Reason(err).Info(cantDetermineLibvirtDomainName)

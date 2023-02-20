@@ -11094,6 +11094,11 @@ var CRDsValidation map[string]string = map[string]string{
             targetNodeDomainDetected:
               description: The Target Node has seen the Domain Start Event
               type: boolean
+            targetNodeDomainStartTimestamp:
+              description: The timestamp at which the target node detects the domain
+                is active
+              format: date-time
+              type: string
             targetNodeTopology:
               description: If the VMI requires dedicated CPUs, this field will hold
                 the numa topology on the target node
@@ -11468,6 +11473,11 @@ var CRDsValidation map[string]string = map[string]string{
             targetNodeDomainDetected:
               description: The Target Node has seen the Domain Start Event
               type: boolean
+            targetNodeDomainStartTimestamp:
+              description: The timestamp at which the target node detects the domain
+                is active
+              format: date-time
+              type: string
             targetNodeTopology:
               description: If the VMI requires dedicated CPUs, this field will hold
                 the numa topology on the target node
