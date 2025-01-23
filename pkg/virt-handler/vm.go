@@ -459,6 +459,61 @@ func (c *VirtualMachineController) startDomainNotifyPipe(domainPipeStopChan chan
 	return nil
 }
 
+func domainIsAlive(domain *api.Domain) bool {
+	if domain == nil {
+		return false
+	}
+	return domain.Status.Status != api.Shutoff &&
+		domain.Status.Status != api.Crashed &&
+		domain.Status.Status != ""
+}
+
+func (c *VirtualMachineController) shouldEvacuateVMI(vmi *v1.VirtualMachineInstance, domain *api.Domain) bool {
+
+	// If VMI or Domain is no longer active, don't evacuate
+	if vmi == nil ||
+		domain == nil ||
+		!vmi.IsRunning() ||
+		!domainIsAlive(domain) {
+		return false
+	}
+
+	// If VMI is being torn down due to deletion, don't evacuate
+	if vmi.DeletionTimestamp != nil {
+		return false
+	}
+
+	// If virt-launcher has not signaled graceful shutdown, don't evacuate
+	gracefulShutdown := c.hasGracefulShutdownTrigger(domain)
+	if !gracefulShutdown {
+		return false
+	}
+
+	markForEviction := false
+
+	// At this point we know we have an active VMI that is not being
+	// deleted, but virt-launcher is signalling to us that the VMI's
+	// pod is being torn down (node level eviction).
+	//
+	// Choose to evacuate (livemigrat) based on the EvictionStrategy
+	// and capabilities of the VMI
+	evictionStrategy := migrations.VMIEvictionStrategy(c.clusterConfig, vmi)
+	switch *evictionStrategy {
+	case v1.EvictionStrategyLiveMigrate:
+		if vmi.IsMigratable() {
+			markForEviction = true
+		}
+	case v1.EvictionStrategyLiveMigrateIfPossible:
+		if vmi.IsMigratable() {
+			markForEviction = true
+		}
+	case v1.EvictionStrategyExternal:
+		markForEviction = true
+	}
+
+	return markForEviction
+}
+
 // Determines if a domain's grace period has expired during shutdown.
 // If the grace period has started but not expired, timeLeft represents
 // the time in seconds left until the period expires.
@@ -1440,6 +1495,14 @@ func (c *VirtualMachineController) updateVMIStatus(origVMI *v1.VirtualMachineIns
 
 	controller.SetVMIPhaseTransitionTimestamp(origVMI, vmi)
 
+	// process eviction
+	if vmi.Status.EvacuationNodeName != vmi.Status.NodeName &&
+		c.shouldEvacuateVMI(vmi, domain) {
+
+		vmi.Status.EvacuationNodeName = vmi.Status.NodeName
+		log.Log.Object(vmi).V(3).Info("Marked node level eviction signal.")
+	}
+
 	// Only issue vmi update if status has changed
 	if !equality.Semantic.DeepEqual(oldStatus, vmi.Status) {
 		key := controller.VirtualMachineInstanceKey(vmi)
@@ -1912,10 +1975,7 @@ func (c *VirtualMachineController) defaultExecute(key string,
 		log.Log.Info("VMI does not exist | Domain does not exist")
 	}
 
-	domainAlive := domainExists &&
-		domain.Status.Status != api.Shutoff &&
-		domain.Status.Status != api.Crashed &&
-		domain.Status.Status != ""
+	domainAlive := domainExists && domainIsAlive(domain)
 
 	domainMigrated := domainExists && domainMigrated(domain)
 	forceShutdownIrrecoverable = domainExists && domainPausedFailedPostCopy(domain)
@@ -1923,8 +1983,16 @@ func (c *VirtualMachineController) defaultExecute(key string,
 	gracefulShutdown := c.hasGracefulShutdownTrigger(domain)
 	if gracefulShutdown && vmi.IsRunning() {
 		if domainAlive {
-			log.Log.Object(vmi).V(3).Info("Shutting down due to graceful shutdown signal.")
-			shouldShutdown = true
+			if c.shouldEvacuateVMI(vmi, domain) {
+				// Node level eviction detected.
+				// ignore graceful shutdown and let virt-controller's evacuation controller
+				// make the decision on how to proceed with the vmi shutdown.
+				log.Log.Object(vmi).V(3).Info("Received node level eviction signal.")
+			} else {
+				log.Log.Object(vmi).V(3).Info("Shutting down due to graceful shutdown signal.")
+				shouldShutdown = true
+			}
+
 		} else {
 			shouldDelete = true
 		}
